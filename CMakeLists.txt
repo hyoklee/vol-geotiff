@@ -1,5 +1,5 @@
 cmake_minimum_required (VERSION 3.9)
-project (template_vol VERSION 1.0.0 DESCRIPTION "template VOL connector" LANGUAGES C)
+project (geotiff_vol VERSION 1.0.0 DESCRIPTION "HDF5 VOL connector for GeoTIFF files" LANGUAGES C)
 
 # Enable testing
 enable_testing ()

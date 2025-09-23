@@ -1,0 +1,60 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+        args: ['--maxkb=1000']
+      - id: check-case-conflict
+      - id: check-merge-conflict
+      - id: check-symlinks
+      - id: check-toml
+      - id: mixed-line-ending
+
+  - repo: https://github.com/pre-commit/mirrors-clang-format
+    rev: v17.0.6
+    hooks:
+      - id: clang-format
+        types: [c]
+        args: [--style=file]
+
+  - repo: local
+    hooks:
+      - id: cppcheck
+        name: cppcheck
+        entry: cppcheck
+        language: system
+        files: \.(c|h)$
+        args:
+          - --enable=all
+          - --error-exitcode=1
+          - --suppress=missingIncludeSystem
+          - --suppress=unusedFunction
+          - --suppress=unmatchedSuppression
+          - --inline-suppr
+
+      - id: check-cmake
+        name: check cmake files
+        entry: cmake
+        language: system
+        files: CMakeLists\.txt$|\.cmake$
+        args: [--help]
+        pass_filenames: false
+
+      - id: no-debug-prints
+        name: check for debug prints
+        entry: 'printf.*[Dd][Ee][Bb][Uu][Gg]'
+        language: pygrep
+        files: \.(c|h)$
+        types: [text]
+
+      - id: check-todos
+        name: check for TODO/FIXME
+        entry: 'TODO|FIXME'
+        language: pygrep
+        files: \.(c|h)$
+        types: [text]
+        # This is a warning, not an error
+        stages: [manual]

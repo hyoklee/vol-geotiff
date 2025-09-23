@@ -1,0 +1,223 @@
+name: Documentation
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  check-docs:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          doxygen \
+          graphviz \
+          python3-pip
+
+        pip3 install \
+          markdown \
+          pygments
+
+    - name: Generate API documentation
+      run: |
+        # Create Doxygen configuration
+        cat > Doxyfile << 'EOF'
+PROJECT_NAME           = "GeoTIFF VOL Connector"
+PROJECT_NUMBER         = "1.0.0"
+PROJECT_BRIEF          = "HDF5 VOL connector for GeoTIFF files"
+
+OUTPUT_DIRECTORY       = docs
+CREATE_SUBDIRS         = NO
+
+INPUT                  = src README.md
+FILE_PATTERNS          = *.c *.h *.md
+RECURSIVE              = YES
+
+EXTRACT_ALL            = YES
+EXTRACT_PRIVATE        = NO
+EXTRACT_STATIC         = YES
+
+GENERATE_HTML          = YES
+HTML_OUTPUT            = html
+HTML_FILE_EXTENSION    = .html
+
+GENERATE_LATEX         = NO
+
+HAVE_DOT               = YES
+DOT_IMAGE_FORMAT       = svg
+INTERACTIVE_SVG        = YES
+
+CALL_GRAPH             = YES
+CALLER_GRAPH           = YES
+
+CLASS_DIAGRAMS         = YES
+UML_LOOK              = YES
+
+SOURCE_BROWSER         = YES
+INLINE_SOURCES         = NO
+
+SEARCHENGINE           = YES
+SERVER_BASED_SEARCH    = NO
+
+GENERATE_TREEVIEW      = YES
+
+QUIET                  = NO
+WARNINGS               = YES
+WARN_IF_UNDOCUMENTED   = YES
+WARN_IF_DOC_ERROR      = YES
+EOF
+
+        doxygen Doxyfile
+
+    - name: Check documentation completeness
+      run: |
+        echo "Checking documentation completeness..."
+
+        # Check if all public functions are documented
+        public_functions=$(grep -n "^[a-zA-Z_][a-zA-Z0-9_]* [a-zA-Z_][a-zA-Z0-9_]*(" src/*.c | grep -v "static" | wc -l)
+        documented_functions=$(grep -r "@brief\|\\brief" src/ | wc -l)
+
+        echo "Public functions found: $public_functions"
+        echo "Documented functions: $documented_functions"
+
+        # Check README sections
+        required_sections=("Features" "Dependencies" "Building" "Usage" "Examples")
+        missing_sections=""
+
+        for section in "${required_sections[@]}"; do
+          if ! grep -q "## $section\|# $section" README.md; then
+            missing_sections="$missing_sections $section"
+          fi
+        done
+
+        if [ -n "$missing_sections" ]; then
+          echo "Warning: Missing sections in README.md:$missing_sections"
+        fi
+
+        # Check for code examples
+        if ! grep -q "```c\|```bash" README.md; then
+          echo "Warning: No code examples found in README.md"
+        fi
+
+    - name: Validate links in documentation
+      run: |
+        echo "Checking for broken links in documentation..."
+
+        # Extract URLs from markdown files
+        urls=$(grep -oh "http[s]*://[^)]*" *.md | sort -u)
+
+        for url in $urls; do
+          if curl --output /dev/null --silent --head --fail "$url"; then
+            echo "✓ $url"
+          else
+            echo "✗ $url (broken)"
+          fi
+        done
+
+    - name: Upload documentation artifacts
+      if: github.event_name == 'push'
+      uses: actions/upload-artifact@v3
+      with:
+        name: documentation
+        path: docs/
+
+  deploy-docs:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: check-docs
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y doxygen graphviz
+
+    - name: Generate documentation
+      run: |
+        # Create enhanced Doxygen configuration
+        cat > Doxyfile << 'EOF'
+PROJECT_NAME           = "GeoTIFF VOL Connector"
+PROJECT_NUMBER         = "1.0.0"
+PROJECT_BRIEF          = "HDF5 VOL connector for GeoTIFF files"
+PROJECT_LOGO           =
+
+OUTPUT_DIRECTORY       = docs
+CREATE_SUBDIRS         = NO
+
+INPUT                  = src README.md
+FILE_PATTERNS          = *.c *.h *.md
+RECURSIVE              = YES
+
+EXTRACT_ALL            = YES
+EXTRACT_PRIVATE        = NO
+EXTRACT_STATIC         = YES
+
+GENERATE_HTML          = YES
+HTML_OUTPUT            = html
+HTML_FILE_EXTENSION    = .html
+HTML_HEADER            =
+HTML_FOOTER            =
+HTML_STYLESHEET        =
+HTML_EXTRA_STYLESHEET  =
+HTML_EXTRA_FILES       =
+
+GENERATE_LATEX         = NO
+
+HAVE_DOT               = YES
+DOT_IMAGE_FORMAT       = svg
+INTERACTIVE_SVG        = YES
+
+CALL_GRAPH             = YES
+CALLER_GRAPH           = YES
+
+CLASS_DIAGRAMS         = YES
+UML_LOOK              = YES
+
+SOURCE_BROWSER         = YES
+INLINE_SOURCES         = NO
+
+SEARCHENGINE           = YES
+SERVER_BASED_SEARCH    = NO
+
+GENERATE_TREEVIEW      = YES
+
+QUIET                  = NO
+WARNINGS               = YES
+WARN_IF_UNDOCUMENTED   = YES
+WARN_IF_DOC_ERROR      = YES
+
+USE_MDFILE_AS_MAINPAGE = README.md
+EOF
+
+        doxygen Doxyfile
+
+        # Create index.html that redirects to the main documentation
+        cat > docs/index.html << 'EOF'
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>GeoTIFF VOL Connector Documentation</title>
+    <meta http-equiv="refresh" content="0; url=html/index.html">
+</head>
+<body>
+    <p>Redirecting to <a href="html/index.html">documentation</a>...</p>
+</body>
+</html>
+EOF
+
+    - name: Deploy to GitHub Pages
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./docs
+        force_orphan: true

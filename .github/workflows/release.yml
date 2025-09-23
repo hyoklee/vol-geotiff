@@ -1,0 +1,226 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: GeoTIFF VOL Connector ${{ github.ref }}
+        body: |
+          # GeoTIFF VOL Connector Release ${{ github.ref }}
+
+          ## What's New
+          - HDF5 Virtual Object Layer connector for GeoTIFF files
+          - Enables reading GeoTIFF files through HDF5 and netCDF tools
+          - Support for multiple data types and spatial metadata
+
+          ## Installation
+          Download the appropriate binary for your platform, or build from source using the instructions in the README.
+
+          ## Dependencies
+          - HDF5 1.14.0 or later
+          - libtiff
+          - libgeotiff
+
+          ## Usage
+          ```bash
+          export HDF5_PLUGIN_PATH=/path/to/vol-geotiff/lib
+          h5dump --vol-name=geotiff_vol_connector sample.tif
+          ncdump sample.tif
+          ```
+
+          See the [README](https://github.com/${{ github.repository }}/blob/${{ github.ref }}/README.md) for complete documentation.
+        draft: false
+        prerelease: false
+
+  build-linux:
+    needs: create-release
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [x86_64]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          cmake \
+          pkg-config \
+          libtiff5-dev \
+          libgeotiff-dev \
+          zlib1g-dev
+
+    - name: Build HDF5
+      run: |
+        wget https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-1.14/hdf5-1.14.3/src/hdf5-1.14.3.tar.gz
+        tar -xzf hdf5-1.14.3.tar.gz
+        cd hdf5-1.14.3
+        mkdir build && cd build
+        cmake .. \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/hdf5-install \
+          -DHDF5_ENABLE_PARALLEL=OFF \
+          -DHDF5_BUILD_TOOLS=ON \
+          -DHDF5_BUILD_EXAMPLES=OFF \
+          -DHDF5_BUILD_TESTS=OFF \
+          -DBUILD_SHARED_LIBS=ON
+        make -j$(nproc)
+        make install
+
+    - name: Build GeoTIFF VOL Connector
+      run: |
+        mkdir build && cd build
+        cmake .. \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DHDF5_DIR=${{ github.workspace }}/hdf5-install/share/cmake \
+          -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/geotiff-vol-install
+        make -j$(nproc)
+        make install
+
+    - name: Create package
+      run: |
+        cd ${{ github.workspace }}
+        mkdir -p geotiff-vol-connector-linux-${{ matrix.arch }}
+        cp -r geotiff-vol-install/* geotiff-vol-connector-linux-${{ matrix.arch }}/
+        cp README.md geotiff-vol-connector-linux-${{ matrix.arch }}/
+        cp COPYING geotiff-vol-connector-linux-${{ matrix.arch }}/LICENSE
+
+        # Create usage script
+        cat > geotiff-vol-connector-linux-${{ matrix.arch }}/setup.sh << 'EOF'
+#!/bin/bash
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+export HDF5_PLUGIN_PATH="${SCRIPT_DIR}/lib"
+echo "GeoTIFF VOL Connector environment configured."
+echo "You can now use: h5dump --vol-name=geotiff_vol_connector your_file.tif"
+EOF
+        chmod +x geotiff-vol-connector-linux-${{ matrix.arch }}/setup.sh
+
+        tar -czf geotiff-vol-connector-linux-${{ matrix.arch }}.tar.gz geotiff-vol-connector-linux-${{ matrix.arch }}
+
+    - name: Upload Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ needs.create-release.outputs.upload_url }}
+        asset_path: ./geotiff-vol-connector-linux-${{ matrix.arch }}.tar.gz
+        asset_name: geotiff-vol-connector-linux-${{ matrix.arch }}.tar.gz
+        asset_content_type: application/gzip
+
+  build-macos:
+    needs: create-release
+    runs-on: macos-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: |
+        brew install cmake pkg-config libtiff libgeotiff
+
+    - name: Build HDF5
+      run: |
+        wget https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-1.14/hdf5-1.14.3/src/hdf5-1.14.3.tar.gz
+        tar -xzf hdf5-1.14.3.tar.gz
+        cd hdf5-1.14.3
+        mkdir build && cd build
+        cmake .. \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/hdf5-install \
+          -DHDF5_ENABLE_PARALLEL=OFF \
+          -DHDF5_BUILD_TOOLS=ON \
+          -DHDF5_BUILD_EXAMPLES=OFF \
+          -DHDF5_BUILD_TESTS=OFF \
+          -DBUILD_SHARED_LIBS=ON
+        make -j$(sysctl -n hw.ncpu)
+        make install
+
+    - name: Build GeoTIFF VOL Connector
+      run: |
+        mkdir build && cd build
+        cmake .. \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DHDF5_DIR=${{ github.workspace }}/hdf5-install/share/cmake \
+          -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/geotiff-vol-install
+        make -j$(sysctl -n hw.ncpu)
+        make install
+
+    - name: Create package
+      run: |
+        cd ${{ github.workspace }}
+        mkdir -p geotiff-vol-connector-macos
+        cp -r geotiff-vol-install/* geotiff-vol-connector-macos/
+        cp README.md geotiff-vol-connector-macos/
+        cp COPYING geotiff-vol-connector-macos/LICENSE
+
+        # Create usage script
+        cat > geotiff-vol-connector-macos/setup.sh << 'EOF'
+#!/bin/bash
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+export HDF5_PLUGIN_PATH="${SCRIPT_DIR}/lib"
+export DYLD_LIBRARY_PATH="${SCRIPT_DIR}/lib:${DYLD_LIBRARY_PATH}"
+echo "GeoTIFF VOL Connector environment configured."
+echo "You can now use: h5dump --vol-name=geotiff_vol_connector your_file.tif"
+EOF
+        chmod +x geotiff-vol-connector-macos/setup.sh
+
+        tar -czf geotiff-vol-connector-macos.tar.gz geotiff-vol-connector-macos
+
+    - name: Upload Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ needs.create-release.outputs.upload_url }}
+        asset_path: ./geotiff-vol-connector-macos.tar.gz
+        asset_name: geotiff-vol-connector-macos.tar.gz
+        asset_content_type: application/gzip
+
+  build-source:
+    needs: create-release
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Create source package
+      run: |
+        cd ${{ github.workspace }}
+        mkdir -p geotiff-vol-connector-source
+
+        # Copy source files
+        cp -r src test geotiff-vol-connector-source/
+        cp README.md COPYING AUTHORS version.txt geotiff-vol-connector-source/
+        cp CMakeLists.txt geotiff-vol-connector-source/
+
+        # Create source tarball
+        tar -czf geotiff-vol-connector-source.tar.gz geotiff-vol-connector-source
+
+    - name: Upload Source Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ needs.create-release.outputs.upload_url }}
+        asset_path: ./geotiff-vol-connector-source.tar.gz
+        asset_name: geotiff-vol-connector-source.tar.gz
+        asset_content_type: application/gzip

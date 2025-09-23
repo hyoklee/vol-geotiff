@@ -1,0 +1,314 @@
+name: Comprehensive Testing
+
+on:
+  schedule:
+    # Run comprehensive tests weekly on Sunday at 2 AM UTC
+    - cron: '0 2 * * 0'
+  workflow_dispatch:
+    # Allow manual triggering
+    inputs:
+      hdf5_versions:
+        description: 'HDF5 versions to test (comma-separated)'
+        required: false
+        default: '1.14.3,1.14.4'
+
+jobs:
+  comprehensive-matrix-test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, ubuntu-20.04, macos-latest]
+        hdf5_version: ${{ fromJson(github.event.inputs.hdf5_versions && format('["{0}"]', join(split(github.event.inputs.hdf5_versions, ','), '","')) || '["1.14.3", "1.14.4"]') }}
+        compiler: [gcc, clang]
+        build_type: [Release, Debug]
+        exclude:
+          # Reduce matrix size for macOS (clang is default)
+          - os: macos-latest
+            compiler: gcc
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up environment
+      run: |
+        echo "OS: ${{ matrix.os }}"
+        echo "HDF5: ${{ matrix.hdf5_version }}"
+        echo "Compiler: ${{ matrix.compiler }}"
+        echo "Build type: ${{ matrix.build_type }}"
+
+    - name: Install Linux dependencies
+      if: runner.os == 'Linux'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          cmake \
+          pkg-config \
+          libtiff5-dev \
+          libgeotiff-dev \
+          zlib1g-dev \
+          libcurl4-openssl-dev \
+          libjpeg-dev \
+          libpng-dev \
+          valgrind
+
+        if [ "${{ matrix.compiler }}" = "clang" ]; then
+          sudo apt-get install -y clang
+        fi
+
+    - name: Install macOS dependencies
+      if: runner.os == 'macOS'
+      run: |
+        brew install cmake pkg-config libtiff libgeotiff
+
+    - name: Cache HDF5
+      id: cache-hdf5
+      uses: actions/cache@v3
+      with:
+        path: ${{ github.workspace }}/hdf5-${{ matrix.hdf5_version }}
+        key: hdf5-${{ matrix.hdf5_version }}-${{ matrix.os }}-${{ matrix.compiler }}-${{ hashFiles('.github/workflows/comprehensive-test.yml') }}
+
+    - name: Build HDF5
+      if: steps.cache-hdf5.outputs.cache-hit != 'true'
+      run: |
+        cd ${{ github.workspace }}
+        wget https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-1.14/hdf5-${{ matrix.hdf5_version }}/src/hdf5-${{ matrix.hdf5_version }}.tar.gz
+        tar -xzf hdf5-${{ matrix.hdf5_version }}.tar.gz
+        cd hdf5-${{ matrix.hdf5_version }}
+        mkdir build && cd build
+
+        if [ "${{ matrix.compiler }}" = "clang" ]; then
+          export CC=clang
+          export CXX=clang++
+        fi
+
+        cmake .. \
+          -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+          -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/hdf5-${{ matrix.hdf5_version }} \
+          -DHDF5_ENABLE_PARALLEL=OFF \
+          -DHDF5_BUILD_TOOLS=ON \
+          -DHDF5_BUILD_EXAMPLES=OFF \
+          -DHDF5_BUILD_TESTS=OFF \
+          -DBUILD_SHARED_LIBS=ON \
+          -DHDF5_ENABLE_Z_LIB_SUPPORT=ON
+
+        if [ "${{ runner.os }}" = "macOS" ]; then
+          make -j$(sysctl -n hw.ncpu)
+        else
+          make -j$(nproc)
+        fi
+        make install
+
+    - name: Create comprehensive test GeoTIFFs
+      run: |
+        cd test
+        python3 << 'EOF'
+import struct
+import os
+
+def create_test_geotiff(filename, width, height, data_type, samples_per_pixel=1):
+    """Create a test GeoTIFF with specified parameters"""
+    data = bytearray()
+
+    # TIFF header
+    data.extend(b'II')  # Little endian
+    data.extend(struct.pack('<H', 42))  # TIFF magic
+    data.extend(struct.pack('<L', 8))   # IFD offset
+
+    # Determine bits per sample and sample format
+    type_map = {
+        'uint8': (8, 1),
+        'uint16': (16, 1),
+        'uint32': (32, 1),
+        'int8': (8, 2),
+        'int16': (16, 2),
+        'int32': (32, 2),
+        'float32': (32, 3),
+        'float64': (64, 3)
+    }
+
+    bits_per_sample, sample_format = type_map.get(data_type, (8, 1))
+    bytes_per_sample = bits_per_sample // 8
+
+    # Calculate image data size
+    image_size = width * height * samples_per_pixel * bytes_per_sample
+
+    # IFD entries
+    num_entries = 12
+    data.extend(struct.pack('<H', num_entries))
+
+    # Required TIFF tags
+    data.extend(struct.pack('<HHL', 256, 4, width))  # ImageWidth
+    data.extend(struct.pack('<HHL', 257, 4, height))  # ImageLength
+    data.extend(struct.pack('<HHL', 258, 3, bits_per_sample))  # BitsPerSample
+    data.extend(struct.pack('<HHL', 259, 3, 1))  # Compression (none)
+    data.extend(struct.pack('<HHL', 262, 3, 1))  # PhotometricInterpretation
+    data.extend(struct.pack('<HHL', 273, 4, 1000))  # StripOffsets
+    data.extend(struct.pack('<HHL', 277, 3, samples_per_pixel))  # SamplesPerPixel
+    data.extend(struct.pack('<HHL', 278, 4, height))  # RowsPerStrip
+    data.extend(struct.pack('<HHL', 279, 4, image_size))  # StripByteCounts
+    data.extend(struct.pack('<HHL', 339, 3, sample_format))  # SampleFormat
+
+    # GeoTIFF tags (minimal)
+    data.extend(struct.pack('<HHL', 33550, 12, 500))  # ModelPixelScaleTag offset
+    data.extend(struct.pack('<HHL', 33922, 12, 512))  # ModelTiepointTag offset
+
+    data.extend(struct.pack('<L', 0))  # Next IFD
+
+    # Pad to offset 500 for ModelPixelScaleTag
+    while len(data) < 500:
+        data.extend(b'\x00')
+
+    # ModelPixelScaleTag (3 doubles: pixel size in X, Y, Z)
+    data.extend(struct.pack('<ddd', 1.0, 1.0, 0.0))
+
+    # ModelTiepointTag (6 doubles: raster point + model point)
+    data.extend(struct.pack('<dddddd', 0.0, 0.0, 0.0, -180.0, 90.0, 0.0))
+
+    # Pad to offset 1000 for image data
+    while len(data) < 1000:
+        data.extend(b'\x00')
+
+    # Generate test image data
+    if data_type == 'float32':
+        for i in range(width * height * samples_per_pixel):
+            data.extend(struct.pack('<f', float(i % 256) / 255.0))
+    elif data_type == 'float64':
+        for i in range(width * height * samples_per_pixel):
+            data.extend(struct.pack('<d', float(i % 256) / 255.0))
+    elif data_type.startswith('uint'):
+        max_val = (1 << bits_per_sample) - 1
+        for i in range(width * height * samples_per_pixel):
+            if bits_per_sample == 8:
+                data.extend(struct.pack('<B', i % max_val))
+            elif bits_per_sample == 16:
+                data.extend(struct.pack('<H', i % max_val))
+            elif bits_per_sample == 32:
+                data.extend(struct.pack('<L', i % max_val))
+    else:  # signed integers
+        max_val = (1 << (bits_per_sample - 1)) - 1
+        for i in range(width * height * samples_per_pixel):
+            val = (i % (2 * max_val)) - max_val
+            if bits_per_sample == 8:
+                data.extend(struct.pack('<b', val))
+            elif bits_per_sample == 16:
+                data.extend(struct.pack('<h', val))
+            elif bits_per_sample == 32:
+                data.extend(struct.pack('<i', val))
+
+    with open(filename, 'wb') as f:
+        f.write(data)
+
+# Create test files
+test_cases = [
+    ('test_uint8.tif', 64, 64, 'uint8', 1),
+    ('test_uint16.tif', 32, 32, 'uint16', 1),
+    ('test_float32.tif', 16, 16, 'float32', 1),
+    ('test_rgb.tif', 32, 32, 'uint8', 3),
+]
+
+for filename, width, height, dtype, samples in test_cases:
+    create_test_geotiff(filename, width, height, dtype, samples)
+    print(f"Created {filename}: {width}x{height}, {dtype}, {samples} samples")
+EOF
+
+    - name: Configure and build
+      run: |
+        mkdir build && cd build
+
+        if [ "${{ matrix.compiler }}" = "clang" ]; then
+          export CC=clang
+          export CXX=clang++
+        fi
+
+        cmake .. \
+          -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+          -DHDF5_DIR=${{ github.workspace }}/hdf5-${{ matrix.hdf5_version }}/share/cmake \
+          -DCMAKE_PREFIX_PATH=${{ github.workspace }}/hdf5-${{ matrix.hdf5_version }} \
+          -DCMAKE_C_FLAGS="-Wall -Wextra"
+
+        if [ "${{ runner.os }}" = "macOS" ]; then
+          make -j$(sysctl -n hw.ncpu)
+        else
+          make -j$(nproc)
+        fi
+
+    - name: Run comprehensive tests
+      run: |
+        cd build
+        export HDF5_PLUGIN_PATH=$PWD/src
+        if [ "${{ runner.os }}" = "Linux" ]; then
+          export LD_LIBRARY_PATH=${{ github.workspace }}/hdf5-${{ matrix.hdf5_version }}/lib:$LD_LIBRARY_PATH
+        else
+          export DYLD_LIBRARY_PATH=${{ github.workspace }}/hdf5-${{ matrix.hdf5_version }}/lib:$DYLD_LIBRARY_PATH
+        fi
+        export PATH=${{ github.workspace }}/hdf5-${{ matrix.hdf5_version }}/bin:$PATH
+
+        # Run basic tests
+        make test
+
+        # Test with different GeoTIFF files
+        for tiff_file in ../test/test_*.tif; do
+          if [ -f "$tiff_file" ]; then
+            echo "Testing with $tiff_file"
+            ./test/test_geotiff_read "$tiff_file" || echo "Test failed for $tiff_file"
+          fi
+        done
+
+    - name: Memory leak test (Linux only)
+      if: runner.os == 'Linux' && matrix.build_type == 'Debug'
+      run: |
+        cd build
+        export HDF5_PLUGIN_PATH=$PWD/src
+        export LD_LIBRARY_PATH=${{ github.workspace }}/hdf5-${{ matrix.hdf5_version }}/lib:$LD_LIBRARY_PATH
+
+        # Run valgrind on basic test
+        valgrind --leak-check=full --error-exitcode=1 ./test/vol_plugin
+
+        # Test one GeoTIFF file with valgrind
+        if [ -f ../test/test_uint8.tif ]; then
+          valgrind --leak-check=full --error-exitcode=1 ./test/test_geotiff_read ../test/test_uint8.tif
+        fi
+
+    - name: Performance test
+      run: |
+        cd build
+        export HDF5_PLUGIN_PATH=$PWD/src
+        if [ "${{ runner.os }}" = "Linux" ]; then
+          export LD_LIBRARY_PATH=${{ github.workspace }}/hdf5-${{ matrix.hdf5_version }}/lib:$LD_LIBRARY_PATH
+        else
+          export DYLD_LIBRARY_PATH=${{ github.workspace }}/hdf5-${{ matrix.hdf5_version }}/lib:$DYLD_LIBRARY_PATH
+        fi
+
+        # Simple performance timing
+        if [ -f ../test/test_uint16.tif ]; then
+          echo "Performance test:"
+          time ./test/test_geotiff_read ../test/test_uint16.tif
+        fi
+
+    - name: Upload test artifacts on failure
+      if: failure()
+      uses: actions/upload-artifact@v3
+      with:
+        name: test-failure-${{ matrix.os }}-${{ matrix.hdf5_version }}-${{ matrix.compiler }}-${{ matrix.build_type }}
+        path: |
+          build/Testing/Temporary/
+          build/CMakeFiles/CMakeOutput.log
+          build/CMakeFiles/CMakeError.log
+
+  test-summary:
+    runs-on: ubuntu-latest
+    needs: comprehensive-matrix-test
+    if: always()
+
+    steps:
+    - name: Test Summary
+      run: |
+        echo "Comprehensive testing completed!"
+        echo "Check individual job results for details."
+
+        if [ "${{ needs.comprehensive-matrix-test.result }}" != "success" ]; then
+          echo "Some tests failed. Please review the job outputs."
+          exit 1
+        fi
