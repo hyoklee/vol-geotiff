@@ -17,6 +17,7 @@
 #ifndef _geotiff_vol_connector_H
 #define _geotiff_vol_connector_H
 
+#include <stdint.h>
 #include <hdf5.h>
 #include <tiffio.h>
 #include <geotiff/geotiff.h>
@@ -96,6 +97,6 @@ herr_t geotiff_attr_close(void *attr, hid_t dxpl_id, void **req);
 /* Helper functions */
 herr_t geotiff_read_image_data(geotiff_file_t *file, geotiff_dataset_t *dset);
 herr_t geotiff_parse_geotiff_tags(geotiff_file_t *file);
-hid_t geotiff_get_hdf5_type_from_tiff(uint16 sample_format, uint16 bits_per_sample);
+hid_t geotiff_get_hdf5_type_from_tiff(uint16_t sample_format, uint16_t bits_per_sample);
 
 #endif /* _geotiff_vol_connector_H */

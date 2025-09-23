@@ -164,7 +164,7 @@ static const H5VL_class_t geotiff_class_g = {
  */
 
 /* Helper function to get HDF5 type from TIFF sample format and bits per sample */
-hid_t geotiff_get_hdf5_type_from_tiff(uint16 sample_format, uint16 bits_per_sample)
+hid_t geotiff_get_hdf5_type_from_tiff(uint16_t sample_format, uint16_t bits_per_sample)
 {
     switch (sample_format) {
         case SAMPLEFORMAT_UINT:
