@@ -18,15 +18,15 @@
 #define _geotiff_vol_connector_H
 
 #if defined(__has_include)
-#  if __has_include(<geotiff/geotiff.h>)
-#    include <geotiff/geotiff.h>
-#  elif __has_include(<geotiff.h>)
-#    include <geotiff.h>
-#  else
-#    error "GeoTIFF header not found. Install libgeotiff and ensure include path is set."
-#  endif
+#if __has_include(<geotiff/geotiff.h>)
+#include <geotiff/geotiff.h>
+#elif __has_include(<geotiff.h>)
+#include <geotiff.h>
 #else
-#  include <geotiff.h>
+#error "GeoTIFF header not found. Install libgeotiff and ensure include path is set."
+#endif
+#else
+#include <geotiff.h>
 #endif
 #include <hdf5.h>
 #include <stdint.h>

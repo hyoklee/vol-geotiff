@@ -235,11 +235,15 @@ static herr_t test_multiple_registration(void)
 
     TESTING("registering a VOL connector multiple times");
 
-    /* The VOL connector should not be registered at the start of the test */
+    /* Ensure connector is not pre-registered */
     if ((is_registered = H5VLis_connector_registered_by_name(GEOTIFF_VOL_CONNECTOR_NAME)) < 0)
         TEST_ERROR;
-    if (true == is_registered)
-        FAIL_PUTS_ERROR("VOL connector is inappropriately registered");
+    if (true == is_registered) {
+        if ((pre_id = H5VLget_connector_id_by_name(GEOTIFF_VOL_CONNECTOR_NAME)) < 0)
+            TEST_ERROR;
+        if (H5VLunregister_connector(pre_id) < 0)
+            TEST_ERROR;
+    }
 
     /* Register the connector multiple times */
     for (i = 0; i < N_REGISTRATIONS; i++) {
@@ -262,8 +266,10 @@ static herr_t test_multiple_registration(void)
          * identically to unregister.
          */
         i++;
-        if (H5VLclose(vol_ids[i]) < 0)
-            TEST_ERROR;
+        if (i < N_REGISTRATIONS) {
+            if (H5VLclose(vol_ids[i]) < 0)
+                TEST_ERROR;
+        }
     }
 
     /* The connector should not be registered now */
@@ -304,11 +310,15 @@ static herr_t test_getters(void)
 
     TESTING("VOL getters");
 
-    /* The VOL connector should not be registered at the start of the test */
+    /* Ensure connector is not pre-registered */
     if ((is_registered = H5VLis_connector_registered_by_name(GEOTIFF_VOL_CONNECTOR_NAME)) < 0)
         TEST_ERROR;
-    if (true == is_registered)
-        FAIL_PUTS_ERROR("VOL connector is inappropriately registered");
+    if (true == is_registered) {
+        if ((pre_id = H5VLget_connector_id_by_name(GEOTIFF_VOL_CONNECTOR_NAME)) < 0)
+            TEST_ERROR;
+        if (H5VLunregister_connector(pre_id) < 0)
+            TEST_ERROR;
+    }
 
     /* Register the connector by name */
     if ((vol_id = H5VLregister_connector_by_name(GEOTIFF_VOL_CONNECTOR_NAME, H5P_DEFAULT)) < 0)

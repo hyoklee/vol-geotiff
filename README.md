@@ -29,7 +29,7 @@ The GeoTIFF VOL connector maps GeoTIFF file structure to HDF5 concepts:
 
 You will need the following to build the GeoTIFF VOL connector:
 
-- **HDF5 1.14.0 or later** with VOL support
+- **HDF5 develop branch (1.15+/2.x)** with VOL support
 - **libtiff** (TIFF library)
 - **libgeotiff** (GeoTIFF library)
 - **CMake 3.9 or later**
@@ -37,9 +37,13 @@ You will need the following to build the GeoTIFF VOL connector:
 
 ### Installing Dependencies
 
-On Ubuntu/Debian:
+On Ubuntu/Debian (using HDF5 develop built from source):
 ```bash
-sudo apt-get install libhdf5-dev libtiff5-dev libgeotiff-dev pkg-config
+sudo apt-get install -y build-essential cmake pkg-config libtiff5-dev libgeotiff-dev
+git clone --depth 1 --branch develop https://github.com/HDFGroup/hdf5.git
+cd hdf5 && mkdir build && cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DHDF5_BUILD_TOOLS=ON -DHDF5_BUILD_TESTS=OFF -DCMAKE_INSTALL_PREFIX=/opt/hdf5-develop
+make -j$(nproc) && sudo make install
 ```
 
 On CentOS/RHEL:
@@ -47,9 +51,10 @@ On CentOS/RHEL:
 sudo yum install hdf5-devel libtiff-devel libgeotiff-devel pkgconfig
 ```
 
-On macOS with Homebrew:
+On macOS with Homebrew (HDF5 develop built from source is required):
 ```bash
-brew install hdf5 libtiff libgeotiff pkg-config
+brew install cmake pkg-config libtiff libgeotiff
+# Build and install HDF5 develop similarly to the Linux instructions above
 ```
 
 ## Building
@@ -57,21 +62,12 @@ brew install hdf5 libtiff libgeotiff pkg-config
 This project uses CMake as the build system. Autotools support has been removed to simplify the build process and maintenance.
 
 ### CMake Build
-
 1. Create a build directory:
    ```bash
    mkdir build && cd build
    ```
 
-2. Configure with CMake:
-   ```bash
-   cmake .. -DHDF5_DIR=/path/to/hdf5/share/cmake
-   ```
-
-3. Build:
-   ```bash
-   make
-   ```
+2. Configure with CMake (point to HDF5 develop install):
 
 4. Run tests:
    ```bash
@@ -80,17 +76,7 @@ This project uses CMake as the build system. Autotools support has been removed 
 
 ### Alternative CMake Configuration
 
-If HDF5 is installed in a standard location, you can simply run:
-```bash
-mkdir build && cd build
-cmake ..
-make
-```
-
-For custom HDF5 installations, specify the path:
-```bash
-cmake .. -DCMAKE_PREFIX_PATH=/path/to/hdf5
-```
+This project requires HDF5 develop (1.15+/2.x). Ensure your `CMAKE_PREFIX_PATH` and/or `HDF5_DIR` point to that install.
 
 ## Usage
 
@@ -222,14 +208,14 @@ cd test
 ### Runtime Errors
 - Check that the GeoTIFF file is valid and accessible
 - Ensure sufficient memory for large images
-- Verify HDF5 version compatibility (1.14.0+)
+- Verify HDF5 version is the develop branch (1.15+/2.x)
 
 ## Development and CI/CD
 
 This project uses GitHub Actions for continuous integration and deployment:
 
 ### Automated Testing
-- **CI Workflow**: Tests on Ubuntu and macOS with multiple HDF5 versions
+- **CI Workflow**: Tests on Ubuntu (and macOS as applicable) with HDF5 develop only
 - **Code Quality**: Static analysis, formatting checks, and security scans
 - **Comprehensive Testing**: Weekly extensive testing across different configurations
 - **Documentation**: Automatic API documentation generation and deployment
@@ -239,7 +225,7 @@ This project uses GitHub Actions for continuous integration and deployment:
 - `.github/workflows/code-quality.yml` - Code quality checks
 - `.github/workflows/docs.yml` - Documentation generation
 - `.github/workflows/release.yml` - Automated releases
-- `.github/workflows/comprehensive-test.yml` - Extended testing
+- `.github/workflows/comprehensive-test.yml` - Extended testing (HDF5 develop only)
 
 ### Development Process
 1. All pull requests must pass CI checks

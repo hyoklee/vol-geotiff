@@ -20,10 +20,10 @@
 #include <H5PLextern.h>
 #include <assert.h>
 #include <hdf5.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdint.h>
 
 #ifdef _MSC_VER
 #ifndef strdup
