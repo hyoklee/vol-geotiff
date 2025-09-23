@@ -7,17 +7,6 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
-    reviewers:
-      - "@maintainers"
-    assignees:
-      - "@maintainers"
     commit-message:
       prefix: "ci"
       include: "scope"
-
-  # CMake dependencies (if using FetchContent or similar)
-  - package-ecosystem: "cmake"
-    directory: "/"
-    schedule:
-      interval: "monthly"
-    open-pull-requests-limit: 3
