@@ -6,37 +6,15 @@ on:
     - cron: '0 2 * * 0'
   workflow_dispatch:
     # Allow manual triggering
-    inputs:
-      hdf5_versions:
-        description: 'HDF5 versions to test (comma-separated)'
-        required: false
-        default: '1.14.3,1.14.4'
 
 jobs:
-  setup-matrix:
-    runs-on: ubuntu-latest
-    outputs:
-      hdf5_versions: ${{ steps.set-matrix.outputs.hdf5_versions }}
-    steps:
-    - name: Set matrix
-      id: set-matrix
-      run: |
-        if [ "${{ github.event.inputs.hdf5_versions }}" != "" ]; then
-          # Convert comma-separated input to JSON array
-          versions=$(echo "${{ github.event.inputs.hdf5_versions }}" | sed 's/,/","/g' | sed 's/^/["/' | sed 's/$/"]/')
-          echo "hdf5_versions=$versions" >> $GITHUB_OUTPUT
-        else
-          echo 'hdf5_versions=["1.14.3", "1.14.4"]' >> $GITHUB_OUTPUT
-        fi
-
   comprehensive-matrix-test:
-    needs: setup-matrix
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, ubuntu-20.04, macos-latest]
-        hdf5_version: ${{ fromJson(needs.setup-matrix.outputs.hdf5_versions) }}
+        hdf5_version: ['develop']
         compiler: [gcc, clang]
         build_type: [Release, Debug]
         exclude:
@@ -84,14 +62,13 @@ jobs:
       uses: actions/cache@v4
       with:
         path: ${{ github.workspace }}/hdf5-${{ matrix.hdf5_version }}
-        key: hdf5-${{ matrix.hdf5_version }}-${{ matrix.os }}-${{ matrix.compiler }}-${{ hashFiles('.github/workflows/comprehensive-test.yml') }}
+        key: hdf5-${{ matrix.hdf5_version }}-${{ matrix.os }}-${{ matrix.compiler }}-${{ github.run_number }}-${{ hashFiles('.github/workflows/comprehensive-test.yml') }}
 
     - name: Build HDF5
       if: steps.cache-hdf5.outputs.cache-hit != 'true'
       run: |
         cd ${{ github.workspace }}
-        wget https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-1.14/hdf5-${{ matrix.hdf5_version }}/src/hdf5-${{ matrix.hdf5_version }}.tar.gz
-        tar -xzf hdf5-${{ matrix.hdf5_version }}.tar.gz
+        git clone --depth 1 --branch develop https://github.com/HDFGroup/hdf5.git hdf5-${{ matrix.hdf5_version }}
         cd hdf5-${{ matrix.hdf5_version }}
         mkdir build && cd build
 

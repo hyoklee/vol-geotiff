@@ -31,7 +31,7 @@ jobs:
           Download the appropriate binary for your platform, or build from source using the instructions in the README.
 
           ## Dependencies
-          - HDF5 1.14.0 or later
+          - HDF5 develop branch (1.15.0+)
           - libtiff
           - libgeotiff
 
@@ -69,9 +69,8 @@ jobs:
 
     - name: Build HDF5
       run: |
-        wget https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-1.14/hdf5-1.14.3/src/hdf5-1.14.3.tar.gz
-        tar -xzf hdf5-1.14.3.tar.gz
-        cd hdf5-1.14.3
+        git clone --depth 1 --branch develop https://github.com/HDFGroup/hdf5.git hdf5-develop
+        cd hdf5-develop
         mkdir build && cd build
         cmake .. \
           -DCMAKE_BUILD_TYPE=Release \
@@ -135,9 +134,8 @@ jobs:
 
     - name: Build HDF5
       run: |
-        wget https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-1.14/hdf5-1.14.3/src/hdf5-1.14.3.tar.gz
-        tar -xzf hdf5-1.14.3.tar.gz
-        cd hdf5-1.14.3
+        git clone --depth 1 --branch develop https://github.com/HDFGroup/hdf5.git hdf5-develop
+        cd hdf5-develop
         mkdir build && cd build
         cmake .. \
           -DCMAKE_BUILD_TYPE=Release \

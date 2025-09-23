@@ -6,7 +6,7 @@ enable_testing ()
 include (CTest)
 
 # Find HDF5
-find_package (HDF5 1.14 COMPONENTS C REQUIRED)
+find_package (HDF5 1.15 COMPONENTS C REQUIRED)
 link_directories (${HDF5_LIBRARY_DIRS})
 include_directories (${HDF5_INCLUDE_DIR})
 set (LINK_LIBS ${LINK_LIBS} ${HDF5_C_${LIB_TYPE}_LIBRARY})
