@@ -8,7 +8,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-int main(int argc, char **argv) {
+int main(int argc, char **argv)
+{
     hid_t fapl_id, file_id, vol_id;
     hid_t dset_id, space_id, type_id;
     hsize_t dims[3];
@@ -70,7 +71,7 @@ int main(int argc, char **argv) {
                 H5Sget_simple_extent_dims(space_id, dims, NULL);
                 printf("Image dimensions: ");
                 for (int i = 0; i < ndims; i++) {
-                    printf("%llu%s", dims[i], (i < ndims-1) ? " x " : "");
+                    printf("%llu%s", dims[i], (i < ndims - 1) ? " x " : "");
                 }
                 printf("\n");
             }
