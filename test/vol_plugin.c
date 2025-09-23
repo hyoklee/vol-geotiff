@@ -20,6 +20,22 @@
 
 #include <hdf5.h>
 #include <stdlib.h>
+#include <string.h>
+
+/* Portable getenv helper that returns a heap-allocated copy */
+static char *get_env_dup(const char *name)
+{
+#ifdef _WIN32
+    char *value = NULL;
+    size_t len  = 0;
+    if (_dupenv_s(&value, &len, name) != 0)
+        return NULL;
+    return value; /* caller must free */
+#else
+    const char *v = getenv(name);
+    return v ? strdup(v) : NULL; /* caller must free */
+#endif
+}
 
 /* herr_t values from H5private.h */
 #define SUCCEED 0
@@ -374,12 +390,14 @@ int main(void)
 
     puts("Testing VOL connector plugin functionality.");
 
-    path = getenv("HDF5_PLUGIN_PATH");
+    path = get_env_dup("HDF5_PLUGIN_PATH");
     printf("HDF5_PLUGIN_PATH = ");
     if (path)
         printf("%s\n", path);
     else
         printf("NULL\n");
+    if (path)
+        free(path);
 
     nerrors += test_registration_by_name() < 0 ? 1 : 0;
     nerrors += test_registration_by_value() < 0 ? 1 : 0;

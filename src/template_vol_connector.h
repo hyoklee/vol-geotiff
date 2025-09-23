@@ -72,9 +72,9 @@ typedef struct geotiff_attr_t {
     size_t data_size;     /* Data size in bytes */
 } geotiff_attr_t;
 
-/* Function prototypes */
-herr_t geotiff_init_connector(void);
-herr_t geotiff_term_connector(void);
+/* Function prototypes (HDF5 develop expects hid_t vipl_id) */
+herr_t geotiff_init_connector(hid_t vipl_id);
+herr_t geotiff_term_connector(hid_t vipl_id);
 
 /* File operations */
 void *geotiff_file_create(const char *name, unsigned flags, hid_t fcpl_id, hid_t fapl_id,

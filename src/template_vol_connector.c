@@ -32,13 +32,13 @@
 #endif
 
 /* GeoTIFF VOL connector initialization */
-herr_t geotiff_init_connector(void)
+herr_t geotiff_init_connector(hid_t vipl_id)
 {
     return 0;
 }
 
 /* GeoTIFF VOL connector termination */
-herr_t geotiff_term_connector(void)
+herr_t geotiff_term_connector(hid_t vipl_id)
 {
     return 0;
 }
