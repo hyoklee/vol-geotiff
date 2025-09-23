@@ -4,7 +4,17 @@ set (GEOTIFF_VOL_NAME geotiff_vol_connector)
 # Find required libraries
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(TIFF REQUIRED libtiff-4)
-pkg_check_modules(GEOTIFF REQUIRED libgeotiff)
+
+# Find libgeotiff manually since it doesn't provide pkg-config
+find_path(GEOTIFF_INCLUDE_DIR geotiff/geotiff.h PATHS /usr/include)
+find_library(GEOTIFF_LIBRARY NAMES geotiff PATHS /usr/lib /usr/lib/x86_64-linux-gnu)
+
+if(NOT GEOTIFF_INCLUDE_DIR OR NOT GEOTIFF_LIBRARY)
+    message(FATAL_ERROR "libgeotiff not found. Please install libgeotiff-dev")
+endif()
+
+set(GEOTIFF_LIBRARIES ${GEOTIFF_LIBRARY})
+set(GEOTIFF_INCLUDE_DIRS ${GEOTIFF_INCLUDE_DIR})
 
 # Build the GeoTIFF VOL connector
 add_library (${GEOTIFF_VOL_NAME} SHARED template_vol_connector.c)

@@ -17,11 +17,9 @@
 #ifndef _geotiff_vol_connector_H
 #define _geotiff_vol_connector_H
 
-#include <geo_keyp.h>
-#include <geo_tiffp.h>
-#include <geotiff.h>
 #include <hdf5.h>
 #include <tiffio.h>
+#include <geotiff/geotiff.h>
 
 /* The value must be between 256 and 65535 (inclusive) */
 #define GEOTIFF_VOL_CONNECTOR_VALUE ((H5VL_class_value_t) 12203)
