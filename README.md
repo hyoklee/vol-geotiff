@@ -1,8 +1,8 @@
 # HDF5 VOL Connector for GeoTIFF
 
-[![CI](https://github.com/your-username/vol-geotiff/workflows/CI/badge.svg)](https://github.com/your-username/vol-geotiff/actions/workflows/ci.yml)
-[![Code Quality](https://github.com/your-username/vol-geotiff/workflows/Code%20Quality/badge.svg)](https://github.com/your-username/vol-geotiff/actions/workflows/code-quality.yml)
-[![Documentation](https://github.com/your-username/vol-geotiff/workflows/Documentation/badge.svg)](https://github.com/your-username/vol-geotiff/actions/workflows/docs.yml)
+[![CI](https://github.com/hyoklee/vol-geotiff/workflows/CI/badge.svg)](https://github.com/hyoklee/vol-geotiff/actions/workflows/ci.yml)
+[![Code Quality](https://github.com/hyoklee/vol-geotiff/workflows/Code%20Quality/badge.svg)](https://github.com/hyoklee/vol-geotiff/actions/workflows/code-quality.yml)
+[![Documentation](https://github.com/hyoklee/vol-geotiff/workflows/Documentation/badge.svg)](https://github.com/hyoklee/vol-geotiff/actions/workflows/docs.yml)
 [![License](https://img.shields.io/badge/License-HDF5-blue.svg)](COPYING)
 
 This project implements an HDF5 Virtual Object Layer (VOL) connector that enables reading GeoTIFF files through HDF5 tools and netCDF-C. This allows users to access GeoTIFF data using familiar HDF5 tools like h5dump, h5ls, and netCDF tools like ncdump.
