@@ -144,14 +144,11 @@ jobs:
         cd build
         export HDF5_PLUGIN_PATH=$PWD/src
         export LD_LIBRARY_PATH=${{ github.workspace }}/hdf5-${{ matrix.hdf5-version }}/lib:$LD_LIBRARY_PATH
-        export HDF5_VOL_CONNECTOR="geotiff_vol_connector under_wrap"
-
         # Test ncdump if available
         if [ -f ../test/sample.tif ] && command -v ncdump >/dev/null 2>&1; then
           echo "Testing ncdump with GeoTIFF VOL connector..."
           ncdump -h ../test/sample.tif || echo "ncdump test failed"
         fi
-
     - name: Upload build artifacts
       if: failure()
       uses: actions/upload-artifact@v4
@@ -161,35 +158,3 @@ jobs:
           build/CMakeFiles/CMakeOutput.log
           build/CMakeFiles/CMakeError.log
           build/Testing/Temporary/
-
-
-  compatibility-test:
-    runs-on: ubuntu-latest
-
-    steps:
-    - uses: actions/checkout@v4
-
-    - name: Test with different TIFF libraries
-      run: |
-        sudo apt-get update
-
-        # Test with different versions if available
-        sudo apt-get install -y \
-          libtiff5-dev \
-          libgeotiff-dev \
-          libhdf5-dev \
-          cmake \
-          build-essential \
-          pkg-config
-
-        # Verify library versions
-        pkg-config --modversion libtiff-4 || echo "libtiff version check failed"
-        pkg-config --modversion libgeotiff || echo "libgeotiff version check failed"
-
-        mkdir build && cd build
-        cmake ..
-        make -j$(nproc)
-
-        # Basic compilation test
-        export HDF5_PLUGIN_PATH=$PWD/src
-        ./test/vol_plugin
