@@ -8,21 +8,19 @@ on:
 jobs:
   create-release:
     runs-on: ubuntu-latest
-    outputs:
-      upload_url: ${{ steps.create_release.outputs.upload_url }}
     steps:
     - uses: actions/checkout@v4
 
     - name: Create Release
       id: create_release
-      uses: actions/create-release@v1
+      uses: softprops/action-gh-release@v2
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: ${{ github.ref }}
-        release_name: GeoTIFF VOL Connector ${{ github.ref }}
+        tag_name: ${{ github.ref_name }}
+        name: GeoTIFF VOL Connector ${{ github.ref_name }}
         body: |
-          # GeoTIFF VOL Connector Release ${{ github.ref }}
+          # GeoTIFF VOL Connector Release ${{ github.ref_name }}
 
           ## What's New
           - HDF5 Virtual Object Layer connector for GeoTIFF files
@@ -44,7 +42,7 @@ jobs:
           ncdump sample.tif
           ```
 
-          See the [README](https://github.com/${{ github.repository }}/blob/${{ github.ref }}/README.md) for complete documentation.
+          See the [README](https://github.com/${{ github.repository }}/blob/${{ github.ref_name }}/README.md) for complete documentation.
         draft: false
         prerelease: false
 
@@ -106,25 +104,23 @@ jobs:
 
         # Create usage script
         cat > geotiff-vol-connector-linux-${{ matrix.arch }}/setup.sh << 'EOF'
-#!/bin/bash
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-export HDF5_PLUGIN_PATH="${SCRIPT_DIR}/lib"
-echo "GeoTIFF VOL Connector environment configured."
-echo "You can now use: h5dump --vol-name=geotiff_vol_connector your_file.tif"
-EOF
+        #!/bin/bash
+        SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+        export HDF5_PLUGIN_PATH="${SCRIPT_DIR}/lib"
+        echo "GeoTIFF VOL Connector environment configured."
+        echo "You can now use: h5dump --vol-name=geotiff_vol_connector your_file.tif"
+        EOF
         chmod +x geotiff-vol-connector-linux-${{ matrix.arch }}/setup.sh
 
         tar -czf geotiff-vol-connector-linux-${{ matrix.arch }}.tar.gz geotiff-vol-connector-linux-${{ matrix.arch }}
 
     - name: Upload Release Asset
-      uses: actions/upload-release-asset@v1
+      uses: softprops/action-gh-release@v2
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        upload_url: ${{ needs.create-release.outputs.upload_url }}
-        asset_path: ./geotiff-vol-connector-linux-${{ matrix.arch }}.tar.gz
-        asset_name: geotiff-vol-connector-linux-${{ matrix.arch }}.tar.gz
-        asset_content_type: application/gzip
+        tag_name: ${{ github.ref_name }}
+        files: ./geotiff-vol-connector-linux-${{ matrix.arch }}.tar.gz
 
   build-macos:
     needs: create-release
@@ -174,26 +170,24 @@ EOF
 
         # Create usage script
         cat > geotiff-vol-connector-macos/setup.sh << 'EOF'
-#!/bin/bash
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-export HDF5_PLUGIN_PATH="${SCRIPT_DIR}/lib"
-export DYLD_LIBRARY_PATH="${SCRIPT_DIR}/lib:${DYLD_LIBRARY_PATH}"
-echo "GeoTIFF VOL Connector environment configured."
-echo "You can now use: h5dump --vol-name=geotiff_vol_connector your_file.tif"
-EOF
+        #!/bin/bash
+        SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+        export HDF5_PLUGIN_PATH="${SCRIPT_DIR}/lib"
+        export DYLD_LIBRARY_PATH="${SCRIPT_DIR}/lib:${DYLD_LIBRARY_PATH}"
+        echo "GeoTIFF VOL Connector environment configured."
+        echo "You can now use: h5dump --vol-name=geotiff_vol_connector your_file.tif"
+        EOF
         chmod +x geotiff-vol-connector-macos/setup.sh
 
         tar -czf geotiff-vol-connector-macos.tar.gz geotiff-vol-connector-macos
 
     - name: Upload Release Asset
-      uses: actions/upload-release-asset@v1
+      uses: softprops/action-gh-release@v2
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        upload_url: ${{ needs.create-release.outputs.upload_url }}
-        asset_path: ./geotiff-vol-connector-macos.tar.gz
-        asset_name: geotiff-vol-connector-macos.tar.gz
-        asset_content_type: application/gzip
+        tag_name: ${{ github.ref_name }}
+        files: ./geotiff-vol-connector-macos.tar.gz
 
   build-source:
     needs: create-release
@@ -216,11 +210,9 @@ EOF
         tar -czf geotiff-vol-connector-source.tar.gz geotiff-vol-connector-source
 
     - name: Upload Source Asset
-      uses: actions/upload-release-asset@v1
+      uses: softprops/action-gh-release@v2
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        upload_url: ${{ needs.create-release.outputs.upload_url }}
-        asset_path: ./geotiff-vol-connector-source.tar.gz
-        asset_name: geotiff-vol-connector-source.tar.gz
-        asset_content_type: application/gzip
+        tag_name: ${{ github.ref_name }}
+        files: ./geotiff-vol-connector-source.tar.gz

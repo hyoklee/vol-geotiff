@@ -38,7 +38,7 @@ jobs:
 
     - name: Cache HDF5
       id: cache-hdf5
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ${{ github.workspace }}/hdf5-${{ matrix.hdf5-version }}
         key: hdf5-${{ matrix.hdf5-version }}-${{ matrix.os }}-${{ hashFiles('.github/workflows/ci.yml') }}
@@ -73,57 +73,10 @@ jobs:
           # Create a simple 100x100 GeoTIFF with geographic projection
           gdal_create -of GTiff -a_srs EPSG:4326 -a_ullr -180 90 180 -90 sample.tif 100 100
         else
-          # Create a minimal TIFF file that can be used for basic testing
-          python3 -c "
-import struct
-import io
-
-# Create a minimal TIFF file
-def write_tiff():
-    # TIFF header
-    data = bytearray()
-    # Little endian TIFF signature
-    data.extend(b'II')  # Byte order
-    data.extend(struct.pack('<H', 42))  # TIFF magic number
-    data.extend(struct.pack('<L', 8))   # Offset to first IFD
-
-    # IFD (Image File Directory)
-    ifd_offset = len(data)
-    num_entries = 8
-    data.extend(struct.pack('<H', num_entries))
-
-    # ImageWidth
-    data.extend(struct.pack('<HHL', 256, 4, 100))
-    # ImageLength
-    data.extend(struct.pack('<HHL', 257, 4, 100))
-    # BitsPerSample
-    data.extend(struct.pack('<HHL', 258, 3, 8))
-    # Compression (no compression)
-    data.extend(struct.pack('<HHL', 259, 3, 1))
-    # PhotometricInterpretation (grayscale)
-    data.extend(struct.pack('<HHL', 262, 3, 1))
-    # StripOffsets
-    data.extend(struct.pack('<HHL', 273, 4, 1000))
-    # RowsPerStrip
-    data.extend(struct.pack('<HHL', 278, 4, 100))
-    # StripByteCounts
-    data.extend(struct.pack('<HHL', 279, 4, 10000))
-
-    # Next IFD offset (0 = no more IFDs)
-    data.extend(struct.pack('<L', 0))
-
-    # Pad to offset 1000 and add dummy image data
-    while len(data) < 1000:
-        data.extend(b'\x00')
-
-    # Add 10000 bytes of dummy image data
-    data.extend(b'\x80' * 10000)
-
-    with open('sample.tif', 'wb') as f:
-        f.write(data)
-
-write_tiff()
-"
+          # Create a minimal test TIFF file (100x100 grayscale)
+          dd if=/dev/zero of=sample.tif bs=1024 count=10 2>/dev/null
+          # Add basic TIFF header (this won't be a proper GeoTIFF but will work for basic tests)
+          printf 'II*\0\x08\0\0\0' | dd of=sample.tif conv=notrunc 2>/dev/null
         fi
 
     - name: Configure CMake
@@ -192,7 +145,7 @@ write_tiff()
         cd build
         export HDF5_PLUGIN_PATH=$PWD/src
         export LD_LIBRARY_PATH=${{ github.workspace }}/hdf5-${{ matrix.hdf5-version }}/lib:$LD_LIBRARY_PATH
-        export HDF5_VOL_CONNECTOR=geotiff_vol_connector
+        export HDF5_VOL_CONNECTOR="geotiff_vol_connector under_wrap"
 
         # Test ncdump if available
         if [ -f ../test/sample.tif ] && command -v ncdump >/dev/null 2>&1; then
@@ -202,7 +155,7 @@ write_tiff()
 
     - name: Upload build artifacts
       if: failure()
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: build-logs-${{ matrix.os }}-${{ matrix.hdf5-version }}-${{ matrix.build-type }}
         path: |

@@ -29,50 +29,50 @@ jobs:
       run: |
         # Create Doxygen configuration
         cat > Doxyfile << 'EOF'
-PROJECT_NAME           = "GeoTIFF VOL Connector"
-PROJECT_NUMBER         = "1.0.0"
-PROJECT_BRIEF          = "HDF5 VOL connector for GeoTIFF files"
+        PROJECT_NAME           = "GeoTIFF VOL Connector"
+        PROJECT_NUMBER         = "1.0.0"
+        PROJECT_BRIEF          = "HDF5 VOL connector for GeoTIFF files"
 
-OUTPUT_DIRECTORY       = docs
-CREATE_SUBDIRS         = NO
+        OUTPUT_DIRECTORY       = docs
+        CREATE_SUBDIRS         = NO
 
-INPUT                  = src README.md
-FILE_PATTERNS          = *.c *.h *.md
-RECURSIVE              = YES
+        INPUT                  = src README.md
+        FILE_PATTERNS          = *.c *.h *.md
+        RECURSIVE              = YES
 
-EXTRACT_ALL            = YES
-EXTRACT_PRIVATE        = NO
-EXTRACT_STATIC         = YES
+        EXTRACT_ALL            = YES
+        EXTRACT_PRIVATE        = NO
+        EXTRACT_STATIC         = YES
 
-GENERATE_HTML          = YES
-HTML_OUTPUT            = html
-HTML_FILE_EXTENSION    = .html
+        GENERATE_HTML          = YES
+        HTML_OUTPUT            = html
+        HTML_FILE_EXTENSION    = .html
 
-GENERATE_LATEX         = NO
+        GENERATE_LATEX         = NO
 
-HAVE_DOT               = YES
-DOT_IMAGE_FORMAT       = svg
-INTERACTIVE_SVG        = YES
+        HAVE_DOT               = YES
+        DOT_IMAGE_FORMAT       = svg
+        INTERACTIVE_SVG        = YES
 
-CALL_GRAPH             = YES
-CALLER_GRAPH           = YES
+        CALL_GRAPH             = YES
+        CALLER_GRAPH           = YES
 
-CLASS_DIAGRAMS         = YES
-UML_LOOK              = YES
+        CLASS_DIAGRAMS         = YES
+        UML_LOOK              = YES
 
-SOURCE_BROWSER         = YES
-INLINE_SOURCES         = NO
+        SOURCE_BROWSER         = YES
+        INLINE_SOURCES         = NO
 
-SEARCHENGINE           = YES
-SERVER_BASED_SEARCH    = NO
+        SEARCHENGINE           = YES
+        SERVER_BASED_SEARCH    = NO
 
-GENERATE_TREEVIEW      = YES
+        GENERATE_TREEVIEW      = YES
 
-QUIET                  = NO
-WARNINGS               = YES
-WARN_IF_UNDOCUMENTED   = YES
-WARN_IF_DOC_ERROR      = YES
-EOF
+        QUIET                  = NO
+        WARNINGS               = YES
+        WARN_IF_UNDOCUMENTED   = YES
+        WARN_IF_DOC_ERROR      = YES
+        EOF
 
         doxygen Doxyfile
 
@@ -123,7 +123,7 @@ EOF
 
     - name: Upload documentation artifacts
       if: github.event_name == 'push'
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: documentation
         path: docs/
@@ -145,78 +145,78 @@ EOF
       run: |
         # Create enhanced Doxygen configuration
         cat > Doxyfile << 'EOF'
-PROJECT_NAME           = "GeoTIFF VOL Connector"
-PROJECT_NUMBER         = "1.0.0"
-PROJECT_BRIEF          = "HDF5 VOL connector for GeoTIFF files"
-PROJECT_LOGO           =
+        PROJECT_NAME           = "GeoTIFF VOL Connector"
+        PROJECT_NUMBER         = "1.0.0"
+        PROJECT_BRIEF          = "HDF5 VOL connector for GeoTIFF files"
+        PROJECT_LOGO           =
 
-OUTPUT_DIRECTORY       = docs
-CREATE_SUBDIRS         = NO
+        OUTPUT_DIRECTORY       = docs
+        CREATE_SUBDIRS         = NO
 
-INPUT                  = src README.md
-FILE_PATTERNS          = *.c *.h *.md
-RECURSIVE              = YES
+        INPUT                  = src README.md
+        FILE_PATTERNS          = *.c *.h *.md
+        RECURSIVE              = YES
 
-EXTRACT_ALL            = YES
-EXTRACT_PRIVATE        = NO
-EXTRACT_STATIC         = YES
+        EXTRACT_ALL            = YES
+        EXTRACT_PRIVATE        = NO
+        EXTRACT_STATIC         = YES
 
-GENERATE_HTML          = YES
-HTML_OUTPUT            = html
-HTML_FILE_EXTENSION    = .html
-HTML_HEADER            =
-HTML_FOOTER            =
-HTML_STYLESHEET        =
-HTML_EXTRA_STYLESHEET  =
-HTML_EXTRA_FILES       =
+        GENERATE_HTML          = YES
+        HTML_OUTPUT            = html
+        HTML_FILE_EXTENSION    = .html
+        HTML_HEADER            =
+        HTML_FOOTER            =
+        HTML_STYLESHEET        =
+        HTML_EXTRA_STYLESHEET  =
+        HTML_EXTRA_FILES       =
 
-GENERATE_LATEX         = NO
+        GENERATE_LATEX         = NO
 
-HAVE_DOT               = YES
-DOT_IMAGE_FORMAT       = svg
-INTERACTIVE_SVG        = YES
+        HAVE_DOT               = YES
+        DOT_IMAGE_FORMAT       = svg
+        INTERACTIVE_SVG        = YES
 
-CALL_GRAPH             = YES
-CALLER_GRAPH           = YES
+        CALL_GRAPH             = YES
+        CALLER_GRAPH           = YES
 
-CLASS_DIAGRAMS         = YES
-UML_LOOK              = YES
+        CLASS_DIAGRAMS         = YES
+        UML_LOOK              = YES
 
-SOURCE_BROWSER         = YES
-INLINE_SOURCES         = NO
+        SOURCE_BROWSER         = YES
+        INLINE_SOURCES         = NO
 
-SEARCHENGINE           = YES
-SERVER_BASED_SEARCH    = NO
+        SEARCHENGINE           = YES
+        SERVER_BASED_SEARCH    = NO
 
-GENERATE_TREEVIEW      = YES
+        GENERATE_TREEVIEW      = YES
 
-QUIET                  = NO
-WARNINGS               = YES
-WARN_IF_UNDOCUMENTED   = YES
-WARN_IF_DOC_ERROR      = YES
+        QUIET                  = NO
+        WARNINGS               = YES
+        WARN_IF_UNDOCUMENTED   = YES
+        WARN_IF_DOC_ERROR      = YES
 
-USE_MDFILE_AS_MAINPAGE = README.md
-EOF
+        USE_MDFILE_AS_MAINPAGE = README.md
+        EOF
 
         doxygen Doxyfile
 
         # Create index.html that redirects to the main documentation
         cat > docs/index.html << 'EOF'
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <title>GeoTIFF VOL Connector Documentation</title>
-    <meta http-equiv="refresh" content="0; url=html/index.html">
-</head>
-<body>
-    <p>Redirecting to <a href="html/index.html">documentation</a>...</p>
-</body>
-</html>
-EOF
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <title>GeoTIFF VOL Connector Documentation</title>
+            <meta http-equiv="refresh" content="0; url=html/index.html">
+        </head>
+        <body>
+            <p>Redirecting to <a href="html/index.html">documentation</a>...</p>
+        </body>
+        </html>
+        EOF
 
     - name: Deploy to GitHub Pages
-      uses: peaceiris/actions-gh-pages@v3
+      uses: peaceiris/actions-gh-pages@v4
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         publish_dir: ./docs

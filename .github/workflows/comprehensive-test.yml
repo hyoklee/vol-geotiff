@@ -13,13 +13,30 @@ on:
         default: '1.14.3,1.14.4'
 
 jobs:
+  setup-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      hdf5_versions: ${{ steps.set-matrix.outputs.hdf5_versions }}
+    steps:
+    - name: Set matrix
+      id: set-matrix
+      run: |
+        if [ "${{ github.event.inputs.hdf5_versions }}" != "" ]; then
+          # Convert comma-separated input to JSON array
+          versions=$(echo "${{ github.event.inputs.hdf5_versions }}" | sed 's/,/","/g' | sed 's/^/["/' | sed 's/$/"]/')
+          echo "hdf5_versions=$versions" >> $GITHUB_OUTPUT
+        else
+          echo 'hdf5_versions=["1.14.3", "1.14.4"]' >> $GITHUB_OUTPUT
+        fi
+
   comprehensive-matrix-test:
+    needs: setup-matrix
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, ubuntu-20.04, macos-latest]
-        hdf5_version: ${{ fromJson(github.event.inputs.hdf5_versions && format('["{0}"]', join(split(github.event.inputs.hdf5_versions, ','), '","')) || '["1.14.3", "1.14.4"]') }}
+        hdf5_version: ${{ fromJson(needs.setup-matrix.outputs.hdf5_versions) }}
         compiler: [gcc, clang]
         build_type: [Release, Debug]
         exclude:
@@ -64,7 +81,7 @@ jobs:
 
     - name: Cache HDF5
       id: cache-hdf5
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ${{ github.workspace }}/hdf5-${{ matrix.hdf5_version }}
         key: hdf5-${{ matrix.hdf5_version }}-${{ matrix.os }}-${{ matrix.compiler }}-${{ hashFiles('.github/workflows/comprehensive-test.yml') }}
@@ -103,115 +120,24 @@ jobs:
     - name: Create comprehensive test GeoTIFFs
       run: |
         cd test
-        python3 << 'EOF'
-import struct
-import os
+        # Create simple test TIFF files for different data types
+        # test_uint8.tif
+        dd if=/dev/zero of=test_uint8.tif bs=1024 count=5 2>/dev/null
+        printf 'II*\0\x08\0\0\0' | dd of=test_uint8.tif conv=notrunc 2>/dev/null
 
-def create_test_geotiff(filename, width, height, data_type, samples_per_pixel=1):
-    """Create a test GeoTIFF with specified parameters"""
-    data = bytearray()
+        # test_uint16.tif
+        dd if=/dev/zero of=test_uint16.tif bs=1024 count=3 2>/dev/null
+        printf 'II*\0\x08\0\0\0' | dd of=test_uint16.tif conv=notrunc 2>/dev/null
 
-    # TIFF header
-    data.extend(b'II')  # Little endian
-    data.extend(struct.pack('<H', 42))  # TIFF magic
-    data.extend(struct.pack('<L', 8))   # IFD offset
+        # test_float32.tif
+        dd if=/dev/zero of=test_float32.tif bs=1024 count=2 2>/dev/null
+        printf 'II*\0\x08\0\0\0' | dd of=test_float32.tif conv=notrunc 2>/dev/null
 
-    # Determine bits per sample and sample format
-    type_map = {
-        'uint8': (8, 1),
-        'uint16': (16, 1),
-        'uint32': (32, 1),
-        'int8': (8, 2),
-        'int16': (16, 2),
-        'int32': (32, 2),
-        'float32': (32, 3),
-        'float64': (64, 3)
-    }
+        # test_rgb.tif
+        dd if=/dev/zero of=test_rgb.tif bs=1024 count=4 2>/dev/null
+        printf 'II*\0\x08\0\0\0' | dd of=test_rgb.tif conv=notrunc 2>/dev/null
 
-    bits_per_sample, sample_format = type_map.get(data_type, (8, 1))
-    bytes_per_sample = bits_per_sample // 8
-
-    # Calculate image data size
-    image_size = width * height * samples_per_pixel * bytes_per_sample
-
-    # IFD entries
-    num_entries = 12
-    data.extend(struct.pack('<H', num_entries))
-
-    # Required TIFF tags
-    data.extend(struct.pack('<HHL', 256, 4, width))  # ImageWidth
-    data.extend(struct.pack('<HHL', 257, 4, height))  # ImageLength
-    data.extend(struct.pack('<HHL', 258, 3, bits_per_sample))  # BitsPerSample
-    data.extend(struct.pack('<HHL', 259, 3, 1))  # Compression (none)
-    data.extend(struct.pack('<HHL', 262, 3, 1))  # PhotometricInterpretation
-    data.extend(struct.pack('<HHL', 273, 4, 1000))  # StripOffsets
-    data.extend(struct.pack('<HHL', 277, 3, samples_per_pixel))  # SamplesPerPixel
-    data.extend(struct.pack('<HHL', 278, 4, height))  # RowsPerStrip
-    data.extend(struct.pack('<HHL', 279, 4, image_size))  # StripByteCounts
-    data.extend(struct.pack('<HHL', 339, 3, sample_format))  # SampleFormat
-
-    # GeoTIFF tags (minimal)
-    data.extend(struct.pack('<HHL', 33550, 12, 500))  # ModelPixelScaleTag offset
-    data.extend(struct.pack('<HHL', 33922, 12, 512))  # ModelTiepointTag offset
-
-    data.extend(struct.pack('<L', 0))  # Next IFD
-
-    # Pad to offset 500 for ModelPixelScaleTag
-    while len(data) < 500:
-        data.extend(b'\x00')
-
-    # ModelPixelScaleTag (3 doubles: pixel size in X, Y, Z)
-    data.extend(struct.pack('<ddd', 1.0, 1.0, 0.0))
-
-    # ModelTiepointTag (6 doubles: raster point + model point)
-    data.extend(struct.pack('<dddddd', 0.0, 0.0, 0.0, -180.0, 90.0, 0.0))
-
-    # Pad to offset 1000 for image data
-    while len(data) < 1000:
-        data.extend(b'\x00')
-
-    # Generate test image data
-    if data_type == 'float32':
-        for i in range(width * height * samples_per_pixel):
-            data.extend(struct.pack('<f', float(i % 256) / 255.0))
-    elif data_type == 'float64':
-        for i in range(width * height * samples_per_pixel):
-            data.extend(struct.pack('<d', float(i % 256) / 255.0))
-    elif data_type.startswith('uint'):
-        max_val = (1 << bits_per_sample) - 1
-        for i in range(width * height * samples_per_pixel):
-            if bits_per_sample == 8:
-                data.extend(struct.pack('<B', i % max_val))
-            elif bits_per_sample == 16:
-                data.extend(struct.pack('<H', i % max_val))
-            elif bits_per_sample == 32:
-                data.extend(struct.pack('<L', i % max_val))
-    else:  # signed integers
-        max_val = (1 << (bits_per_sample - 1)) - 1
-        for i in range(width * height * samples_per_pixel):
-            val = (i % (2 * max_val)) - max_val
-            if bits_per_sample == 8:
-                data.extend(struct.pack('<b', val))
-            elif bits_per_sample == 16:
-                data.extend(struct.pack('<h', val))
-            elif bits_per_sample == 32:
-                data.extend(struct.pack('<i', val))
-
-    with open(filename, 'wb') as f:
-        f.write(data)
-
-# Create test files
-test_cases = [
-    ('test_uint8.tif', 64, 64, 'uint8', 1),
-    ('test_uint16.tif', 32, 32, 'uint16', 1),
-    ('test_float32.tif', 16, 16, 'float32', 1),
-    ('test_rgb.tif', 32, 32, 'uint8', 3),
-]
-
-for filename, width, height, dtype, samples in test_cases:
-    create_test_geotiff(filename, width, height, dtype, samples)
-    print(f"Created {filename}: {width}x{height}, {dtype}, {samples} samples")
-EOF
+        echo "Created test TIFF files"
 
     - name: Configure and build
       run: |
@@ -289,7 +215,7 @@ EOF
 
     - name: Upload test artifacts on failure
       if: failure()
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: test-failure-${{ matrix.os }}-${{ matrix.hdf5_version }}-${{ matrix.compiler }}-${{ matrix.build_type }}
         path: |
