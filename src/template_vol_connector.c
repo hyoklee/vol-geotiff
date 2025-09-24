@@ -44,12 +44,12 @@ herr_t geotiff_term_connector(void)
 }
 
 /* Simple introspect opt_query function that reports no optional operations are supported */
-herr_t geotiff_introspect_opt_query(void __attribute__((unused)) *obj, H5VL_subclass_t subcls, int opt_type,
-                                    uint64_t __attribute__((unused)) *flags)
+herr_t geotiff_introspect_opt_query(void __attribute__((unused)) * obj, H5VL_subclass_t subcls,
+                                    int opt_type, uint64_t __attribute__((unused)) * flags)
 {
     /* We don't support any optional operations */
-    (void)subcls;
-    (void)opt_type;
+    (void) subcls;
+    (void) opt_type;
     return 0;
 }
 
@@ -147,9 +147,9 @@ static const H5VL_class_t geotiff_class_g = {
     },
     {
         /* introscpect_cls */
-        NULL,                          /* get_conn_cls  */
-        NULL,                          /* get_cap_flags */
-        geotiff_introspect_opt_query   /* opt_query     */
+        NULL,                        /* get_conn_cls  */
+        NULL,                        /* get_cap_flags */
+        geotiff_introspect_opt_query /* opt_query     */
     },
     {
         /* request_cls */
