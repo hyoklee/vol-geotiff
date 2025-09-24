@@ -27,7 +27,7 @@ static char *get_env_dup(const char *name)
 {
 #ifdef _WIN32
     char *value = NULL;
-    size_t len  = 0;
+    size_t len = 0;
     if (_dupenv_s(&value, &len, name) != 0)
         return NULL;
     return value; /* caller must free */
