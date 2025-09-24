@@ -11,11 +11,11 @@ target_link_libraries (test_geotiff_read PRIVATE HDF5::HDF5)
 # Add the test
 add_test (vol_plugin vol_plugin)
 set_tests_properties(vol_plugin PROPERTIES
-    ENVIRONMENT "HDF5_PLUGIN_PATH=${PROJECT_BINARY_DIR}/src/Release\;${PROJECT_BINARY_DIR}/src;PATH=C:/src/hdf5-dev/install/bin\;C:/src/vcpkg.microsoft/installed/x64-windows/bin\;$ENV{PATH};HDF5_VOL_CONNECTOR=")
+    ENVIRONMENT "HDF5_PLUGIN_PATH=${PROJECT_BINARY_DIR}/src")
 
 # Add the GeoTIFF test (if a sample GeoTIFF file exists)
 if(EXISTS "${PROJECT_SOURCE_DIR}/test/sample.tif")
     add_test (test_geotiff_read test_geotiff_read "${PROJECT_SOURCE_DIR}/test/sample.tif")
     set_tests_properties(test_geotiff_read PROPERTIES
-        ENVIRONMENT "HDF5_PLUGIN_PATH=${PROJECT_BINARY_DIR}/src/Release\;${PROJECT_BINARY_DIR}/src;PATH=C:/src/hdf5-dev/install/bin\;C:/src/vcpkg.microsoft/installed/x64-windows/bin\;$ENV{PATH};HDF5_VOL_CONNECTOR=")
+        ENVIRONMENT "HDF5_PLUGIN_PATH=${PROJECT_BINARY_DIR}/src")
 endif()
