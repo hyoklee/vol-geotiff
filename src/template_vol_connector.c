@@ -600,7 +600,7 @@ herr_t geotiff_read_image_data(geotiff_file_t *file, geotiff_dataset_t *dset)
     }
 
     /* Validate reasonable data size to prevent memory issues */
-    size_t total_size = (size_t)height * (size_t)scanline_size;
+    size_t total_size = (size_t) height * (size_t) scanline_size;
     if (total_size > 100 * 1024 * 1024) { /* 100MB limit */
         return -1;
     }
