@@ -351,6 +351,13 @@ void *geotiff_dataset_open(void *obj, const H5VL_loc_params_t __attribute__((unu
             return NULL;
         }
 
+        /* Validate image dimensions */
+        if (width == 0 || height == 0 || width > 65535 || height > 65535) {
+            free(dset->name);
+            free(dset);
+            return NULL;
+        }
+
         TIFFGetFieldDefaulted(file->tiff, TIFFTAG_SAMPLESPERPIXEL, &samples_per_pixel);
         TIFFGetFieldDefaulted(file->tiff, TIFFTAG_BITSPERSAMPLE, &bits_per_sample);
         TIFFGetFieldDefaulted(file->tiff, TIFFTAG_SAMPLEFORMAT, &sample_format);
@@ -368,7 +375,18 @@ void *geotiff_dataset_open(void *obj, const H5VL_loc_params_t __attribute__((unu
             dset->space_id = H5Screate_simple(2, dims, NULL);
         }
 
-        geotiff_read_image_data(file, dset);
+        if (dset->space_id < 0) {
+            free(dset->name);
+            free(dset);
+            return NULL;
+        }
+
+        if (geotiff_read_image_data(file, dset) < 0) {
+            H5Sclose(dset->space_id);
+            free(dset->name);
+            free(dset);
+            return NULL;
+        }
     }
 
     return dset;
@@ -559,8 +577,17 @@ herr_t geotiff_read_image_data(geotiff_file_t *file, geotiff_dataset_t *dset)
     uint32_t row;
     unsigned char *image_data;
 
+    if (!file || !file->tiff || !dset) {
+        return -1;
+    }
+
     if (!TIFFGetField(file->tiff, TIFFTAG_IMAGEWIDTH, &width) ||
         !TIFFGetField(file->tiff, TIFFTAG_IMAGELENGTH, &height)) {
+        return -1;
+    }
+
+    /* Validate reasonable image dimensions */
+    if (width == 0 || height == 0 || width > 65535 || height > 65535) {
         return -1;
     }
 
@@ -568,7 +595,17 @@ herr_t geotiff_read_image_data(geotiff_file_t *file, geotiff_dataset_t *dset)
     TIFFGetFieldDefaulted(file->tiff, TIFFTAG_BITSPERSAMPLE, &bits_per_sample);
 
     scanline_size = TIFFScanlineSize(file->tiff);
-    dset->data_size = height * scanline_size;
+    if (scanline_size <= 0) {
+        return -1;
+    }
+
+    /* Validate reasonable data size to prevent memory issues */
+    size_t total_size = (size_t)height * (size_t)scanline_size;
+    if (total_size > 100 * 1024 * 1024) { /* 100MB limit */
+        return -1;
+    }
+
+    dset->data_size = total_size;
     dset->data = malloc(dset->data_size);
 
     if (!dset->data)
@@ -580,6 +617,7 @@ herr_t geotiff_read_image_data(geotiff_file_t *file, geotiff_dataset_t *dset)
         if (TIFFReadScanline(file->tiff, image_data + row * scanline_size, row, 0) < 0) {
             free(dset->data);
             dset->data = NULL;
+            dset->data_size = 0;
             return -1;
         }
     }
