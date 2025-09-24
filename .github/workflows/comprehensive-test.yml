@@ -13,7 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, ubuntu-20.04, macos-latest]
+        os: [ubuntu-latest, macos-latest]
         hdf5_version: ['develop']
         compiler: [gcc, clang]
         build_type: [Release, Debug]
