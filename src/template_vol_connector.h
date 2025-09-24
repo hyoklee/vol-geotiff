@@ -74,13 +74,13 @@ typedef struct geotiff_attr_t {
 
 /* Function prototypes (HDF5 develop expects hid_t vipl_id) */
 herr_t geotiff_init_connector(hid_t vipl_id);
-herr_t geotiff_term_connector(hid_t vipl_id);
+herr_t geotiff_term_connector(void);
 
 /* File operations */
 void *geotiff_file_create(const char *name, unsigned flags, hid_t fcpl_id, hid_t fapl_id,
                           hid_t dxpl_id, void **req);
 void *geotiff_file_open(const char *name, unsigned flags, hid_t fapl_id, hid_t dxpl_id, void **req);
-herr_t geotiff_file_get(void *file, H5VL_file_get_args_t *args, hid_t dxpl_id, void **req);
+herr_t geotiff_file_get(const void *file, H5VL_file_get_args_t *args, hid_t dxpl_id, void **req);
 herr_t geotiff_file_close(void *file, hid_t dxpl_id, void **req);
 
 /* Dataset operations */
@@ -88,7 +88,8 @@ void *geotiff_dataset_open(void *obj, const H5VL_loc_params_t *loc_params, const
                            hid_t dapl_id, hid_t dxpl_id, void **req);
 herr_t geotiff_dataset_read(size_t count, void *dset[], hid_t mem_type_id[], hid_t mem_space_id[],
                             hid_t file_space_id[], hid_t dxpl_id, void *buf[], void **req);
-herr_t geotiff_dataset_get(void *dset, H5VL_dataset_get_args_t *args, hid_t dxpl_id, void **req);
+herr_t geotiff_dataset_get(const void *dset, H5VL_dataset_get_args_t *args, hid_t dxpl_id,
+                           void **req);
 herr_t geotiff_dataset_close(void *dset, hid_t dxpl_id, void **req);
 
 /* Group operations */
@@ -100,8 +101,8 @@ herr_t geotiff_group_close(void *grp, hid_t dxpl_id, void **req);
 /* Attribute operations */
 void *geotiff_attr_open(void *obj, const H5VL_loc_params_t *loc_params, const char *name,
                         hid_t aapl_id, hid_t dxpl_id, void **req);
-herr_t geotiff_attr_read(void *attr, hid_t mem_type_id, void *buf, hid_t dxpl_id, void **req);
-herr_t geotiff_attr_get(void *obj, H5VL_attr_get_args_t *args, hid_t dxpl_id, void **req);
+herr_t geotiff_attr_read(const void *attr, hid_t mem_type_id, void *buf, hid_t dxpl_id, void **req);
+herr_t geotiff_attr_get(const void *obj, H5VL_attr_get_args_t *args, hid_t dxpl_id, void **req);
 herr_t geotiff_attr_close(void *attr, hid_t dxpl_id, void **req);
 
 /* Helper functions */

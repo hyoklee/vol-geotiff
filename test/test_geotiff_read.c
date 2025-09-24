@@ -71,7 +71,7 @@ int main(int argc, char **argv)
                 H5Sget_simple_extent_dims(space_id, dims, NULL);
                 printf("Image dimensions: ");
                 for (int i = 0; i < ndims; i++) {
-                    printf("%llu%s", dims[i], (i < ndims - 1) ? " x " : "");
+                    printf("%lu%s", (unsigned long) dims[i], (i < ndims - 1) ? " x " : "");
                 }
                 printf("\n");
             }

@@ -32,13 +32,13 @@
 #endif
 
 /* GeoTIFF VOL connector initialization */
-herr_t geotiff_init_connector(hid_t vipl_id)
+herr_t geotiff_init_connector(hid_t __attribute__((unused)) vipl_id)
 {
     return 0;
 }
 
 /* GeoTIFF VOL connector termination */
-herr_t geotiff_term_connector(hid_t vipl_id)
+herr_t geotiff_term_connector(void)
 {
     return 0;
 }
@@ -215,13 +215,18 @@ hid_t geotiff_get_hdf5_type_from_tiff(uint16_t sample_format, uint16_t bits_per_
 }
 
 /* File operations */
-void *geotiff_file_create(const char *name, unsigned flags, hid_t fcpl_id, hid_t fapl_id,
-                          hid_t dxpl_id, void **req)
+void *geotiff_file_create(const char __attribute__((unused)) * name,
+                          unsigned __attribute__((unused)) flags,
+                          hid_t __attribute__((unused)) fcpl_id,
+                          hid_t __attribute__((unused)) fapl_id,
+                          hid_t __attribute__((unused)) dxpl_id,
+                          void __attribute__((unused)) * *req)
 {
     return NULL;
 }
 
-void *geotiff_file_open(const char *name, unsigned flags, hid_t fapl_id, hid_t dxpl_id, void **req)
+void *geotiff_file_open(const char *name, unsigned flags, hid_t fapl_id,
+                        hid_t __attribute__((unused)) dxpl_id, void __attribute__((unused)) * *req)
 {
     geotiff_file_t *file;
 
@@ -256,7 +261,8 @@ void *geotiff_file_open(const char *name, unsigned flags, hid_t fapl_id, hid_t d
     return file;
 }
 
-herr_t geotiff_file_get(const void *file, H5VL_file_get_args_t *args, hid_t dxpl_id, void **req)
+herr_t geotiff_file_get(const void *file, H5VL_file_get_args_t *args,
+                        hid_t __attribute__((unused)) dxpl_id, void __attribute__((unused)) * *req)
 {
     const geotiff_file_t *f = (const geotiff_file_t *) file;
 
@@ -279,7 +285,8 @@ herr_t geotiff_file_get(const void *file, H5VL_file_get_args_t *args, hid_t dxpl
     return 0;
 }
 
-herr_t geotiff_file_close(void *file, hid_t dxpl_id, void **req)
+herr_t geotiff_file_close(void *file, hid_t __attribute__((unused)) dxpl_id,
+                          void __attribute__((unused)) * *req)
 {
     geotiff_file_t *f = (geotiff_file_t *) file;
 
@@ -297,8 +304,10 @@ herr_t geotiff_file_close(void *file, hid_t dxpl_id, void **req)
 }
 
 /* Dataset operations */
-void *geotiff_dataset_open(void *obj, const H5VL_loc_params_t *loc_params, const char *name,
-                           hid_t dapl_id, hid_t dxpl_id, void **req)
+void *geotiff_dataset_open(void *obj, const H5VL_loc_params_t __attribute__((unused)) * loc_params,
+                           const char *name, hid_t __attribute__((unused)) dapl_id,
+                           hid_t __attribute__((unused)) dxpl_id,
+                           void __attribute__((unused)) * *req)
 {
     geotiff_file_t *file = (geotiff_file_t *) obj;
     geotiff_dataset_t *dset;
@@ -352,8 +361,12 @@ void *geotiff_dataset_open(void *obj, const H5VL_loc_params_t *loc_params, const
     return dset;
 }
 
-herr_t geotiff_dataset_read(size_t count, void *dset[], hid_t mem_type_id[], hid_t mem_space_id[],
-                            hid_t file_space_id[], hid_t dxpl_id, void *buf[], void **req)
+herr_t geotiff_dataset_read(size_t __attribute__((unused)) count, void *dset[],
+                            hid_t __attribute__((unused)) mem_type_id[],
+                            hid_t __attribute__((unused)) mem_space_id[],
+                            hid_t __attribute__((unused)) file_space_id[],
+                            hid_t __attribute__((unused)) dxpl_id, void *buf[],
+                            void __attribute__((unused)) * *req)
 {
     const geotiff_dataset_t *d = (const geotiff_dataset_t *) dset[0];
 
@@ -365,8 +378,9 @@ herr_t geotiff_dataset_read(size_t count, void *dset[], hid_t mem_type_id[], hid
     return 0;
 }
 
-herr_t geotiff_dataset_get(const void *dset, H5VL_dataset_get_args_t *args, hid_t dxpl_id,
-                           void **req)
+herr_t geotiff_dataset_get(const void *dset, H5VL_dataset_get_args_t *args,
+                           hid_t __attribute__((unused)) dxpl_id,
+                           void __attribute__((unused)) * *req)
 {
     const geotiff_dataset_t *d = (const geotiff_dataset_t *) dset;
 
@@ -384,7 +398,8 @@ herr_t geotiff_dataset_get(const void *dset, H5VL_dataset_get_args_t *args, hid_
     return 0;
 }
 
-herr_t geotiff_dataset_close(void *dset, hid_t dxpl_id, void **req)
+herr_t geotiff_dataset_close(void *dset, hid_t __attribute__((unused)) dxpl_id,
+                             void __attribute__((unused)) * *req)
 {
     geotiff_dataset_t *d = (geotiff_dataset_t *) dset;
 
@@ -400,8 +415,9 @@ herr_t geotiff_dataset_close(void *dset, hid_t dxpl_id, void **req)
 }
 
 /* Group operations */
-void *geotiff_group_open(void *obj, const H5VL_loc_params_t *loc_params, const char *name,
-                         hid_t gapl_id, hid_t dxpl_id, void **req)
+void *geotiff_group_open(void *obj, const H5VL_loc_params_t __attribute__((unused)) * loc_params,
+                         const char *name, hid_t __attribute__((unused)) gapl_id,
+                         hid_t __attribute__((unused)) dxpl_id, void __attribute__((unused)) * *req)
 {
     geotiff_file_t *file = (geotiff_file_t *) obj;
     geotiff_group_t *grp;
@@ -422,12 +438,15 @@ void *geotiff_group_open(void *obj, const H5VL_loc_params_t *loc_params, const c
     return grp;
 }
 
-herr_t geotiff_group_get(void *obj, H5VL_group_get_args_t *args, hid_t dxpl_id, void **req)
+herr_t geotiff_group_get(void __attribute__((unused)) * obj,
+                         H5VL_group_get_args_t __attribute__((unused)) * args,
+                         hid_t __attribute__((unused)) dxpl_id, void __attribute__((unused)) * *req)
 {
     return 0;
 }
 
-herr_t geotiff_group_close(void *grp, hid_t dxpl_id, void **req)
+herr_t geotiff_group_close(void *grp, hid_t __attribute__((unused)) dxpl_id,
+                           void __attribute__((unused)) * *req)
 {
     geotiff_group_t *g = (geotiff_group_t *) grp;
 
@@ -441,8 +460,9 @@ herr_t geotiff_group_close(void *grp, hid_t dxpl_id, void **req)
 }
 
 /* Attribute operations */
-void *geotiff_attr_open(void *obj, const H5VL_loc_params_t *loc_params, const char *name,
-                        hid_t aapl_id, hid_t dxpl_id, void **req)
+void *geotiff_attr_open(void *obj, const H5VL_loc_params_t __attribute__((unused)) * loc_params,
+                        const char *name, hid_t __attribute__((unused)) aapl_id,
+                        hid_t __attribute__((unused)) dxpl_id, void __attribute__((unused)) * *req)
 {
     geotiff_file_t *file = (geotiff_file_t *) obj;
     geotiff_attr_t *attr;
@@ -464,7 +484,8 @@ void *geotiff_attr_open(void *obj, const H5VL_loc_params_t *loc_params, const ch
     return attr;
 }
 
-herr_t geotiff_attr_read(const void *attr, hid_t mem_type_id, void *buf, hid_t dxpl_id, void **req)
+herr_t geotiff_attr_read(const void *attr, hid_t __attribute__((unused)) mem_type_id, void *buf,
+                         hid_t __attribute__((unused)) dxpl_id, void __attribute__((unused)) * *req)
 {
     const geotiff_attr_t *a = (const geotiff_attr_t *) attr;
 
@@ -478,7 +499,8 @@ herr_t geotiff_attr_read(const void *attr, hid_t mem_type_id, void *buf, hid_t d
     return 0;
 }
 
-herr_t geotiff_attr_get(const void *obj, H5VL_attr_get_args_t *args, hid_t dxpl_id, void **req)
+herr_t geotiff_attr_get(const void *obj, H5VL_attr_get_args_t *args,
+                        hid_t __attribute__((unused)) dxpl_id, void __attribute__((unused)) * *req)
 {
     const geotiff_attr_t *a = (const geotiff_attr_t *) obj;
 
@@ -496,7 +518,8 @@ herr_t geotiff_attr_get(const void *obj, H5VL_attr_get_args_t *args, hid_t dxpl_
     return 0;
 }
 
-herr_t geotiff_attr_close(void *attr, hid_t dxpl_id, void **req)
+herr_t geotiff_attr_close(void *attr, hid_t __attribute__((unused)) dxpl_id,
+                          void __attribute__((unused)) * *req)
 {
     geotiff_attr_t *a = (geotiff_attr_t *) attr;
 
