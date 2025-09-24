@@ -20,13 +20,13 @@
 /* Try to include geotiff headers in standard locations */
 // cppcheck-suppress preprocessorErrorDirective
 #if defined(__has_include) && __has_include(<geotiff/geotiff.h>)
-  #include <geotiff/geotiff.h>
+#include <geotiff/geotiff.h>
 // cppcheck-suppress preprocessorErrorDirective
 #elif defined(__has_include) && __has_include(<geotiff.h>)
-  #include <geotiff.h>
+#include <geotiff.h>
 #else
-  /* Fallback to standard include */
-  #include <geotiff.h>
+/* Fallback to standard include */
+#include <geotiff.h>
 #endif
 #include <hdf5.h>
 #include <stdint.h>

@@ -365,7 +365,8 @@ herr_t geotiff_dataset_read(size_t count, void *dset[], hid_t mem_type_id[], hid
     return 0;
 }
 
-herr_t geotiff_dataset_get(const void *dset, H5VL_dataset_get_args_t *args, hid_t dxpl_id, void **req)
+herr_t geotiff_dataset_get(const void *dset, H5VL_dataset_get_args_t *args, hid_t dxpl_id,
+                           void **req)
 {
     const geotiff_dataset_t *d = (const geotiff_dataset_t *) dset;
 
