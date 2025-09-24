@@ -261,7 +261,7 @@ void *geotiff_file_open(const char *name, unsigned flags, hid_t fapl_id,
     return file;
 }
 
-herr_t geotiff_file_get(const void *file, H5VL_file_get_args_t *args,
+herr_t geotiff_file_get(void *file, H5VL_file_get_args_t *args,
                         hid_t __attribute__((unused)) dxpl_id, void __attribute__((unused)) * *req)
 {
     const geotiff_file_t *f = (const geotiff_file_t *) file;
@@ -378,7 +378,7 @@ herr_t geotiff_dataset_read(size_t __attribute__((unused)) count, void *dset[],
     return 0;
 }
 
-herr_t geotiff_dataset_get(const void *dset, H5VL_dataset_get_args_t *args,
+herr_t geotiff_dataset_get(void *dset, H5VL_dataset_get_args_t *args,
                            hid_t __attribute__((unused)) dxpl_id,
                            void __attribute__((unused)) * *req)
 {
@@ -484,7 +484,7 @@ void *geotiff_attr_open(void *obj, const H5VL_loc_params_t __attribute__((unused
     return attr;
 }
 
-herr_t geotiff_attr_read(const void *attr, hid_t __attribute__((unused)) mem_type_id, void *buf,
+herr_t geotiff_attr_read(void *attr, hid_t __attribute__((unused)) mem_type_id, void *buf,
                          hid_t __attribute__((unused)) dxpl_id, void __attribute__((unused)) * *req)
 {
     const geotiff_attr_t *a = (const geotiff_attr_t *) attr;
@@ -499,7 +499,7 @@ herr_t geotiff_attr_read(const void *attr, hid_t __attribute__((unused)) mem_typ
     return 0;
 }
 
-herr_t geotiff_attr_get(const void *obj, H5VL_attr_get_args_t *args,
+herr_t geotiff_attr_get(void *obj, H5VL_attr_get_args_t *args,
                         hid_t __attribute__((unused)) dxpl_id, void __attribute__((unused)) * *req)
 {
     const geotiff_attr_t *a = (const geotiff_attr_t *) obj;
