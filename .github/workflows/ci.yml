@@ -70,43 +70,10 @@ jobs:
 
       - name: Create sample GeoTIFF
         run: |
-          sudo apt-get install -y gdal-bin python3-pil || \
-            echo "GDAL/PIL not available"
           cd test
-
           # Use existing sample.tif if it exists and is valid
           if [ -f sample.tif ] && [ -s sample.tif ]; then
             echo "Using existing sample.tif"
-          elif command -v gdal_translate >/dev/null 2>&1; then
-            echo "Creating GeoTIFF with gdal_translate..."
-            # Create a simple 8x8 grayscale image data file
-            printf "0 0 0 0 0 0 0 0\n0 255 255 255 255 255 255 0\n" > temp_data.txt
-            printf "0 255 0 0 0 0 255 0\n0 255 0 255 255 0 255 0\n" >> temp_data.txt
-            printf "0 255 0 255 255 0 255 0\n0 255 0 0 0 0 255 0\n" >> temp_data.txt
-            printf "0 255 255 255 255 255 255 0\n0 0 0 0 0 0 0 0\n" >> temp_data.txt
-            # Convert to GeoTIFF with GDAL
-            gdal_translate -of GTiff -ot Byte temp_data.txt sample.tif
-            rm -f temp_data.txt
-          else
-            # Create using Python PIL as fallback
-            python3 -c "
-from PIL import Image
-import numpy as np
-# Create 8x8 grayscale test image
-data = np.array([
-    [0,0,0,0,0,0,0,0],
-    [0,255,255,255,255,255,255,0],
-    [0,255,0,0,0,0,255,0],
-    [0,255,0,255,255,0,255,0],
-    [0,255,0,255,255,0,255,0],
-    [0,255,0,0,0,0,255,0],
-    [0,255,255,255,255,255,255,0],
-    [0,0,0,0,0,0,0,0]
-], dtype=np.uint8)
-img = Image.fromarray(data, mode='L')
-img.save('sample.tif', format='TIFF')
-print('Created sample.tif using PIL')
-"
           fi
 
       - name: Configure CMake

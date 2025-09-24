@@ -22,7 +22,9 @@
       "Bash(tiffinfo:*)",
       "Read(//home/hyoklee/tmp/include/**)",
       "Bash(python3:*)",
-      "Bash(./test/test_geotiff_read ../test/sample_new.tif)"
+      "Bash(./test/test_geotiff_read ../test/sample_new.tif)",
+      "Bash(./test/test_geotiff_read ../test/invalid.tif)",
+      "Bash(yamllint:*)"
     ],
     "deny": [],
     "ask": []
