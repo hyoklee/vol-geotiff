@@ -1,10 +1,11 @@
+---
 name: CI
 
-on:
+'on':
   push:
-    branches: [ main, master, develop ]
+    branches: [main, master, develop]
   pull_request:
-    branches: [ main, master, develop ]
+    branches: [main, master, develop]
 
 jobs:
   test:
@@ -17,81 +18,78 @@ jobs:
         build-type: [Release, Debug]
 
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Install system dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y \
-          build-essential \
-          cmake \
-          pkg-config \
-          libtiff5-dev \
-          libgeotiff-dev \
-          zlib1g-dev \
-          libcurl4-openssl-dev \
-          libjpeg-dev \
-          libpng-dev \
-          libwebp-dev \
-          libzstd-dev \
-          liblzma-dev
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            pkg-config \
+            libtiff5-dev \
+            libgeotiff-dev \
+            zlib1g-dev \
+            libcurl4-openssl-dev \
+            libjpeg-dev \
+            libpng-dev \
+            libwebp-dev \
+            libzstd-dev \
+            liblzma-dev
 
-    - name: Cache HDF5
-      id: cache-hdf5
-      uses: actions/cache@v4
-      with:
-        path: ${{ github.workspace }}/hdf5-${{ matrix.hdf5-version }}
-        key: hdf5-${{ matrix.hdf5-version }}-${{ matrix.os }}-${{ github.run_number }}-${{ hashFiles('.github/workflows/ci.yml') }}
+      - name: Cache HDF5
+        id: cache-hdf5
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/hdf5-${{ matrix.hdf5-version }}
+          key: >-
+            hdf5-${{ matrix.hdf5-version }}-${{ matrix.os }}-
+            ${{ github.run_number }}-${{ hashFiles('.github/workflows/ci.yml') }}
 
-    - name: Build HDF5
-      if: steps.cache-hdf5.outputs.cache-hit != 'true'
-      run: |
-        cd ${{ github.workspace }}
-        git clone --depth 1 --branch develop https://github.com/HDFGroup/hdf5.git hdf5-${{ matrix.hdf5-version }}
-        cd hdf5-${{ matrix.hdf5-version }}
-        mkdir build && cd build
-        cmake .. \
-          -DCMAKE_BUILD_TYPE=${{ matrix.build-type }} \
-          -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/hdf5-${{ matrix.hdf5-version }} \
-          -DHDF5_ENABLE_PARALLEL=OFF \
-          -DHDF5_BUILD_TOOLS=ON \
-          -DHDF5_BUILD_EXAMPLES=OFF \
-          -DHDF5_BUILD_TESTS=OFF \
-          -DBUILD_SHARED_LIBS=ON \
-          -DHDF5_ENABLE_Z_LIB_SUPPORT=ON \
-          -DHDF5_ENABLE_SZIP_SUPPORT=OFF
-        make -j$(nproc)
-        make install
+      - name: Build HDF5
+        if: steps.cache-hdf5.outputs.cache-hit != 'true'
+        run: |
+          cd ${{ github.workspace }}
+          git clone --depth 1 --branch develop \
+            https://github.com/HDFGroup/hdf5.git \
+            hdf5-${{ matrix.hdf5-version }}
+          cd hdf5-${{ matrix.hdf5-version }}
+          mkdir build && cd build
+          cmake .. \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build-type }} \
+            -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/hdf5-${{ matrix.hdf5-version }} \
+            -DHDF5_ENABLE_PARALLEL=OFF \
+            -DHDF5_BUILD_TOOLS=ON \
+            -DHDF5_BUILD_EXAMPLES=OFF \
+            -DHDF5_BUILD_TESTS=OFF \
+            -DBUILD_SHARED_LIBS=ON \
+            -DHDF5_ENABLE_Z_LIB_SUPPORT=ON \
+            -DHDF5_ENABLE_SZIP_SUPPORT=OFF
+          make -j$(nproc)
+          make install
 
-    - name: Create sample GeoTIFF
-      run: |
-        # Create a simple GeoTIFF using GDAL (if available) or use existing test file
-        sudo apt-get install -y gdal-bin python3-pil || echo "GDAL/PIL not available"
-        cd test
+      - name: Create sample GeoTIFF
+        run: |
+          sudo apt-get install -y gdal-bin python3-pil || \
+            echo "GDAL/PIL not available"
+          cd test
 
-        # Use existing sample.tif if it exists and is valid
-        if [ -f sample.tif ] && [ -s sample.tif ]; then
-          echo "Using existing sample.tif"
-        elif command -v gdal_translate >/dev/null 2>&1; then
-          # Create a simple 8x8 GeoTIFF with geographic projection using gdal_translate
-          echo "Creating GeoTIFF with gdal_translate..."
-          # First create a simple text data file
-          cat > temp_data.txt << 'EOF'
-0 0 0 0 0 0 0 0
-0 255 255 255 255 255 255 0
-0 255 0 0 0 0 255 0
-0 255 0 255 255 0 255 0
-0 255 0 255 255 0 255 0
-0 255 0 0 0 0 255 0
-0 255 255 255 255 255 255 0
-0 0 0 0 0 0 0 0
-EOF
-          # Convert to GeoTIFF with GDAL
-          gdal_translate -of GTiff -ot Byte temp_data.txt sample.tif
-          rm -f temp_data.txt
-        else
-          # Create using Python PIL as fallback
-          python3 -c "
+          # Use existing sample.tif if it exists and is valid
+          if [ -f sample.tif ] && [ -s sample.tif ]; then
+            echo "Using existing sample.tif"
+          elif command -v gdal_translate >/dev/null 2>&1; then
+            echo "Creating GeoTIFF with gdal_translate..."
+            # Create a simple 8x8 grayscale image data file
+            printf "0 0 0 0 0 0 0 0\n0 255 255 255 255 255 255 0\n" > temp_data.txt
+            printf "0 255 0 0 0 0 255 0\n0 255 0 255 255 0 255 0\n" >> temp_data.txt
+            printf "0 255 0 255 255 0 255 0\n0 255 0 0 0 0 255 0\n" >> temp_data.txt
+            printf "0 255 255 255 255 255 255 0\n0 0 0 0 0 0 0 0\n" >> temp_data.txt
+            # Convert to GeoTIFF with GDAL
+            gdal_translate -of GTiff -ot Byte temp_data.txt sample.tif
+            rm -f temp_data.txt
+          else
+            # Create using Python PIL as fallback
+            python3 -c "
 from PIL import Image
 import numpy as np
 # Create 8x8 grayscale test image
@@ -109,85 +107,90 @@ img = Image.fromarray(data, mode='L')
 img.save('sample.tif', format='TIFF')
 print('Created sample.tif using PIL')
 "
-        fi
+          fi
 
-    - name: Configure CMake
-      run: |
-        mkdir build && cd build
-        cmake .. \
-          -DCMAKE_BUILD_TYPE=${{ matrix.build-type }} \
-          -DHDF5_DIR=${{ github.workspace }}/hdf5-${{ matrix.hdf5-version }}/share/cmake \
-          -DCMAKE_PREFIX_PATH=${{ github.workspace }}/hdf5-${{ matrix.hdf5-version }}
+      - name: Configure CMake
+        run: |
+          mkdir build && cd build
+          cmake .. \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build-type }} \
+            -DHDF5_DIR=${{ github.workspace }}/hdf5-${{ matrix.hdf5-version }}/share/cmake \
+            -DCMAKE_PREFIX_PATH=${{ github.workspace }}/hdf5-${{ matrix.hdf5-version }}
 
-    - name: Build
-      run: |
-        cd build
-        make -j$(nproc)
+      - name: Build
+        run: |
+          cd build
+          make -j$(nproc)
 
-    - name: Run basic tests
-      run: |
-        cd build
-        export HDF5_PLUGIN_PATH=$PWD/src
-        export LD_LIBRARY_PATH=${{ github.workspace }}/hdf5-${{ matrix.hdf5-version }}/lib:$LD_LIBRARY_PATH
-        export PATH=${{ github.workspace }}/hdf5-${{ matrix.hdf5-version }}/bin:$PATH
-        make test
+      - name: Run basic tests
+        run: |
+          cd build
+          export HDF5_PLUGIN_PATH=$PWD/src
+          export LD_LIBRARY_PATH=${{ github.workspace }}/hdf5-${{ matrix.hdf5-version }}/lib:$LD_LIBRARY_PATH
+          export PATH=${{ github.workspace }}/hdf5-${{ matrix.hdf5-version }}/bin:$PATH
+          make test
 
-    - name: Test VOL plugin registration
-      run: |
-        cd build
-        export HDF5_PLUGIN_PATH=$PWD/src
-        export LD_LIBRARY_PATH=${{ github.workspace }}/hdf5-${{ matrix.hdf5-version }}/lib:$LD_LIBRARY_PATH
-        ./test/vol_plugin
+      - name: Test VOL plugin registration
+        run: |
+          cd build
+          export HDF5_PLUGIN_PATH=$PWD/src
+          export LD_LIBRARY_PATH=${{ github.workspace }}/hdf5-${{ matrix.hdf5-version }}/lib:$LD_LIBRARY_PATH
+          ./test/vol_plugin
 
-    - name: Test GeoTIFF reading
-      run: |
-        cd build
-        export HDF5_PLUGIN_PATH=$PWD/src
-        export LD_LIBRARY_PATH=${{ github.workspace }}/hdf5-${{ matrix.hdf5-version }}/lib:$LD_LIBRARY_PATH
-        if [ -f ../test/sample.tif ]; then
-          ./test/test_geotiff_read ../test/sample.tif
-        else
-          echo "No sample.tif found, skipping GeoTIFF read test"
-        fi
+      - name: Test GeoTIFF reading
+        run: |
+          cd build
+          export HDF5_PLUGIN_PATH=$PWD/src
+          export LD_LIBRARY_PATH=${{ github.workspace }}/hdf5-${{ matrix.hdf5-version }}/lib:$LD_LIBRARY_PATH
+          if [ -f ../test/sample.tif ]; then
+            ./test/test_geotiff_read ../test/sample.tif
+          else
+            echo "No sample.tif found, skipping GeoTIFF read test"
+          fi
 
-    - name: Test HDF5 tools integration
-      run: |
-        cd build
-        export HDF5_PLUGIN_PATH=$PWD/src
-        export LD_LIBRARY_PATH=${{ github.workspace }}/hdf5-${{ matrix.hdf5-version }}/lib:$LD_LIBRARY_PATH
-        export PATH=${{ github.workspace }}/hdf5-${{ matrix.hdf5-version }}/bin:$PATH
+      - name: Test HDF5 tools integration
+        run: |
+          cd build
+          export HDF5_PLUGIN_PATH=$PWD/src
+          export LD_LIBRARY_PATH=${{ github.workspace }}/hdf5-${{ matrix.hdf5-version }}/lib:$LD_LIBRARY_PATH
+          export PATH=${{ github.workspace }}/hdf5-${{ matrix.hdf5-version }}/bin:$PATH
 
-        # Test h5ls
-        if [ -f ../test/sample.tif ] && command -v h5ls >/dev/null 2>&1; then
-          echo "Testing h5ls with GeoTIFF VOL connector..."
-          h5ls --vol-name=geotiff_vol_connector ../test/sample.tif || echo "h5ls test failed"
-        fi
+          # Test h5ls
+          if [ -f ../test/sample.tif ] && command -v h5ls >/dev/null 2>&1; then
+            echo "Testing h5ls with GeoTIFF VOL connector..."
+            h5ls --vol-name=geotiff_vol_connector ../test/sample.tif || \
+              echo "h5ls test failed"
+          fi
 
-        # Test h5dump
-        if [ -f ../test/sample.tif ] && command -v h5dump >/dev/null 2>&1; then
-          echo "Testing h5dump with GeoTIFF VOL connector..."
-          h5dump --vol-name=geotiff_vol_connector ../test/sample.tif || echo "h5dump test failed"
-        fi
+          # Test h5dump
+          if [ -f ../test/sample.tif ] && command -v h5dump >/dev/null 2>&1; then
+            echo "Testing h5dump with GeoTIFF VOL connector..."
+            h5dump --vol-name=geotiff_vol_connector ../test/sample.tif || \
+              echo "h5dump test failed"
+          fi
 
-    - name: Install netCDF-C and test
-      run: |
-        # Install netCDF-C
-        sudo apt-get install -y libnetcdf-dev netcdf-bin || echo "netCDF not available"
+      - name: Install netCDF-C and test
+        run: |
+          # Install netCDF-C
+          sudo apt-get install -y libnetcdf-dev netcdf-bin || \
+            echo "netCDF not available"
 
-        cd build
-        export HDF5_PLUGIN_PATH=$PWD/src
-        export LD_LIBRARY_PATH=${{ github.workspace }}/hdf5-${{ matrix.hdf5-version }}/lib:$LD_LIBRARY_PATH
-        # Test ncdump if available
-        if [ -f ../test/sample.tif ] && command -v ncdump >/dev/null 2>&1; then
-          echo "Testing ncdump with GeoTIFF VOL connector..."
-          ncdump -h ../test/sample.tif || echo "ncdump test failed"
-        fi
-    - name: Upload build artifacts
-      if: failure()
-      uses: actions/upload-artifact@v4
-      with:
-        name: build-logs-${{ matrix.os }}-${{ matrix.hdf5-version }}-${{ matrix.build-type }}
-        path: |
-          build/CMakeFiles/CMakeOutput.log
-          build/CMakeFiles/CMakeError.log
-          build/Testing/Temporary/
+          cd build
+          export HDF5_PLUGIN_PATH=$PWD/src
+          export LD_LIBRARY_PATH=${{ github.workspace }}/hdf5-${{ matrix.hdf5-version }}/lib:$LD_LIBRARY_PATH
+          # Test ncdump if available
+          if [ -f ../test/sample.tif ] && command -v ncdump >/dev/null 2>&1; then
+            echo "Testing ncdump with GeoTIFF VOL connector..."
+            ncdump -h ../test/sample.tif || echo "ncdump test failed"
+          fi
+
+      - name: Upload build artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: >-
+            build-logs-${{ matrix.os }}-${{ matrix.hdf5-version }}-${{ matrix.build-type }}
+          path: |
+            build/CMakeFiles/CMakeOutput.log
+            build/CMakeFiles/CMakeError.log
+            build/Testing/Temporary/
