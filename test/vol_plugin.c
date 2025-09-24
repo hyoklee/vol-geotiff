@@ -16,6 +16,7 @@
  *              dynamically-loaded plugin.
  */
 
+// cppcheck-suppress missingInclude
 #include "template_vol_connector.h"
 
 #include <hdf5.h>

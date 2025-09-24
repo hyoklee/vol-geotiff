@@ -256,9 +256,9 @@ void *geotiff_file_open(const char *name, unsigned flags, hid_t fapl_id, hid_t d
     return file;
 }
 
-herr_t geotiff_file_get(void *file, H5VL_file_get_args_t *args, hid_t dxpl_id, void **req)
+herr_t geotiff_file_get(const void *file, H5VL_file_get_args_t *args, hid_t dxpl_id, void **req)
 {
-    geotiff_file_t *f = (geotiff_file_t *) file;
+    const geotiff_file_t *f = (const geotiff_file_t *) file;
 
     switch (args->op_type) {
         case H5VL_FILE_GET_NAME:
@@ -304,7 +304,7 @@ void *geotiff_dataset_open(void *obj, const H5VL_loc_params_t *loc_params, const
     geotiff_dataset_t *dset;
     uint32_t width, height;
     uint16_t samples_per_pixel, bits_per_sample, sample_format;
-    hsize_t dims[2];
+    hsize_t dims[3];
 
     if (!file || !name)
         return NULL;
@@ -355,7 +355,7 @@ void *geotiff_dataset_open(void *obj, const H5VL_loc_params_t *loc_params, const
 herr_t geotiff_dataset_read(size_t count, void *dset[], hid_t mem_type_id[], hid_t mem_space_id[],
                             hid_t file_space_id[], hid_t dxpl_id, void *buf[], void **req)
 {
-    geotiff_dataset_t *d = (geotiff_dataset_t *) dset[0];
+    const geotiff_dataset_t *d = (const geotiff_dataset_t *) dset[0];
 
     if (!d || !d->data || !buf[0])
         return -1;
@@ -365,9 +365,9 @@ herr_t geotiff_dataset_read(size_t count, void *dset[], hid_t mem_type_id[], hid
     return 0;
 }
 
-herr_t geotiff_dataset_get(void *dset, H5VL_dataset_get_args_t *args, hid_t dxpl_id, void **req)
+herr_t geotiff_dataset_get(const void *dset, H5VL_dataset_get_args_t *args, hid_t dxpl_id, void **req)
 {
-    geotiff_dataset_t *d = (geotiff_dataset_t *) dset;
+    const geotiff_dataset_t *d = (const geotiff_dataset_t *) dset;
 
     switch (args->op_type) {
         case H5VL_DATASET_GET_SPACE:
@@ -463,9 +463,9 @@ void *geotiff_attr_open(void *obj, const H5VL_loc_params_t *loc_params, const ch
     return attr;
 }
 
-herr_t geotiff_attr_read(void *attr, hid_t mem_type_id, void *buf, hid_t dxpl_id, void **req)
+herr_t geotiff_attr_read(const void *attr, hid_t mem_type_id, void *buf, hid_t dxpl_id, void **req)
 {
-    geotiff_attr_t *a = (geotiff_attr_t *) attr;
+    const geotiff_attr_t *a = (const geotiff_attr_t *) attr;
 
     if (!a || !buf)
         return -1;
@@ -477,9 +477,9 @@ herr_t geotiff_attr_read(void *attr, hid_t mem_type_id, void *buf, hid_t dxpl_id
     return 0;
 }
 
-herr_t geotiff_attr_get(void *obj, H5VL_attr_get_args_t *args, hid_t dxpl_id, void **req)
+herr_t geotiff_attr_get(const void *obj, H5VL_attr_get_args_t *args, hid_t dxpl_id, void **req)
 {
-    geotiff_attr_t *a = (geotiff_attr_t *) obj;
+    const geotiff_attr_t *a = (const geotiff_attr_t *) obj;
 
     switch (args->op_type) {
         case H5VL_ATTR_GET_SPACE:

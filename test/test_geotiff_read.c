@@ -3,6 +3,7 @@
  * Tests reading a GeoTIFF file through HDF5 interface
  */
 
+// cppcheck-suppress missingInclude
 #include "template_vol_connector.h"
 #include <hdf5.h>
 #include <stdio.h>
@@ -13,7 +14,6 @@ int main(int argc, char **argv)
     hid_t fapl_id, file_id, vol_id;
     hid_t dset_id, space_id, type_id;
     hsize_t dims[3];
-    int ndims;
     herr_t ret;
 
     if (argc != 2) {
@@ -66,7 +66,7 @@ int main(int argc, char **argv)
         /* Get dataspace */
         space_id = H5Dget_space(dset_id);
         if (space_id >= 0) {
-            ndims = H5Sget_simple_extent_ndims(space_id);
+            int ndims = H5Sget_simple_extent_ndims(space_id);
             if (ndims > 0 && ndims <= 3) {
                 H5Sget_simple_extent_dims(space_id, dims, NULL);
                 printf("Image dimensions: ");
