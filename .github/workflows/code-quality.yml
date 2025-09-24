@@ -98,7 +98,6 @@ jobs:
       run: |
         # Check for potential security issues
         echo "Checking for potential security issues..."
-
         # Buffer overflow patterns
         if grep -r "strcpy\|strcat\|sprintf\|gets" src/ --include="*.c" --include="*.h"; then
           echo "Warning: Found potentially unsafe string functions"
@@ -125,7 +124,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Install dependencies
+    - name: Install system dependencies
       run: |
         sudo apt-get update
         sudo apt-get install -y \
@@ -134,8 +133,36 @@ jobs:
           clang \
           libtiff5-dev \
           libgeotiff-dev \
-          libhdf5-dev \
-          pkg-config
+          pkg-config \
+          zlib1g-dev \
+          libjpeg-dev \
+          libpng-dev
+
+    - name: Cache HDF5 (develop)
+      id: cache-hdf5
+      uses: actions/cache@v4
+      with:
+        path: ${{ github.workspace }}/hdf5-develop
+        key: hdf5-develop-${{ matrix.compiler }}-${{ runner.os }}-${{ github.run_number }}-${{ hashFiles('.github/workflows/code-quality.yml') }}
+
+    - name: Build HDF5 develop
+      if: steps.cache-hdf5.outputs.cache-hit != 'true'
+      run: |
+        cd ${{ github.workspace }}
+        git clone --depth 1 --branch develop https://github.com/HDFGroup/hdf5.git hdf5-develop-src
+        cd hdf5-develop-src
+        mkdir build && cd build
+        cmake .. \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/hdf5-develop \
+          -DHDF5_ENABLE_PARALLEL=OFF \
+          -DHDF5_BUILD_TOOLS=ON \
+          -DHDF5_BUILD_EXAMPLES=OFF \
+          -DHDF5_BUILD_TESTS=OFF \
+          -DBUILD_SHARED_LIBS=ON \
+          -DHDF5_ENABLE_Z_LIB_SUPPORT=ON
+        make -j$(nproc)
+        make install
 
     - name: Build with ${{ matrix.compiler }}
       run: |
@@ -151,7 +178,9 @@ jobs:
 
         cmake .. \
           -DCMAKE_BUILD_TYPE=Debug \
-          -DCMAKE_C_FLAGS="-Wall -Wextra -Werror"
+          -DCMAKE_C_FLAGS="-Wall -Wextra -Werror" \
+          -DHDF5_DIR=${{ github.workspace }}/hdf5-develop/share/cmake \
+          -DCMAKE_PREFIX_PATH=${{ github.workspace }}/hdf5-develop
 
         make -j$(nproc)
 
@@ -159,4 +188,5 @@ jobs:
       run: |
         cd build-${{ matrix.compiler }}
         export HDF5_PLUGIN_PATH=$PWD/src
+        export LD_LIBRARY_PATH=${{ github.workspace }}/hdf5-develop/lib:$LD_LIBRARY_PATH
         make test

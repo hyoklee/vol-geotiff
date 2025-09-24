@@ -261,6 +261,15 @@ make test
 clang-format -i src/*.c src/*.h test/*.c test/*.h
 ```
 
+### Pre-commit on Windows (PowerShell)
+```powershell
+# One-time setup: installs pre-commit and installs git hook
+scripts/setup-precommit.ps1 -Install
+
+# Run hooks on all files
+pre-commit run --all-files
+```
+
 ## License
 
 This project is licensed under the same terms as HDF5. See the COPYING file for details.

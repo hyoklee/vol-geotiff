@@ -70,7 +70,7 @@ jobs:
         cd test
         if command -v gdal_create >/dev/null 2>&1; then
           # Create a simple 100x100 GeoTIFF with geographic projection
-          gdal_create -of GTiff -a_srs EPSG:4326 -a_ullr -180 90 180 -90 sample.tif 100 100
+          gdal_create -of GTiff -a_srs EPSG:4326 -a_ullr -180 90 180 -90 sample.tif -ts 100 100
         else
           # Create a minimal test TIFF file (100x100 grayscale)
           dd if=/dev/zero of=sample.tif bs=1024 count=10 2>/dev/null
