@@ -76,14 +76,16 @@ jobs:
           # Create a simple 8x8 GeoTIFF with geographic projection using gdal_translate
           echo "Creating GeoTIFF with gdal_translate..."
           # First create a simple text data file
-          echo "0 0 0 0 0 0 0 0
+          cat > temp_data.txt << 'EOF'
+0 0 0 0 0 0 0 0
 0 255 255 255 255 255 255 0
 0 255 0 0 0 0 255 0
 0 255 0 255 255 0 255 0
 0 255 0 255 255 0 255 0
 0 255 0 0 0 0 255 0
 0 255 255 255 255 255 255 0
-0 0 0 0 0 0 0 0" > temp_data.txt
+0 0 0 0 0 0 0 0
+EOF
           # Convert to GeoTIFF with GDAL
           gdal_translate -of GTiff -ot Byte temp_data.txt sample.tif
           rm -f temp_data.txt
