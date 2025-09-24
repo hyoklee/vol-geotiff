@@ -80,6 +80,7 @@ jobs:
         run: |
           mkdir build && cd build
           cmake .. \
+            -DSITE="ubu" -DBUILDNAME="vol-geotiff/${{ matrix.build-type }}"  \
             -DCMAKE_BUILD_TYPE=${{ matrix.build-type }} \
             -DHDF5_DIR=${{ github.workspace }}/hdf5-${{ matrix.hdf5-version }}/share/cmake \
             -DCMAKE_PREFIX_PATH=${{ github.workspace }}/hdf5-${{ matrix.hdf5-version }}
@@ -95,7 +96,8 @@ jobs:
           export HDF5_PLUGIN_PATH=$PWD/src
           export LD_LIBRARY_PATH=${{ github.workspace }}/hdf5-${{ matrix.hdf5-version }}/lib:$LD_LIBRARY_PATH
           export PATH=${{ github.workspace }}/hdf5-${{ matrix.hdf5-version }}/bin:$PATH
-          make test
+          ctest -D Experimental
+#          make test
 
       - name: Test VOL plugin registration
         run: |
