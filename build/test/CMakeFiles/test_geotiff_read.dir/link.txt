@@ -1,1 +1,0 @@
-/usr/bin/cc -O3 -DNDEBUG CMakeFiles/test_geotiff_read.dir/test_geotiff_read.c.o -o test_geotiff_read  -Wl,-rpath,/home/hyoklee/hdf5-install/lib /home/hyoklee/hdf5-install/lib/libhdf5.so.1000.0.0 
