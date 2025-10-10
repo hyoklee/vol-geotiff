@@ -106,6 +106,9 @@ herr_t geotiff_attr_close(void *attr, hid_t dxpl_id, void **req);
 
 /* Helper functions */
 herr_t geotiff_read_image_data(geotiff_file_t *file, geotiff_dataset_t *dset);
+herr_t geotiff_read_hyperslab(const geotiff_dataset_t *dset, const hsize_t *start,
+                              const hsize_t *stride, const hsize_t *count, const hsize_t *block,
+                              int ndims, hid_t mem_type_id, void *buf);
 herr_t geotiff_parse_geotiff_tags(geotiff_file_t *file);
 hid_t geotiff_get_hdf5_type_from_tiff(uint16_t sample_format, uint16_t bits_per_sample);
 

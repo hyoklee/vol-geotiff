@@ -29,6 +29,10 @@
 #ifndef strdup
 #define strdup _strdup
 #endif
+/* MSVC doesn't support __attribute__ */
+#ifndef __attribute__
+#define __attribute__(x)
+#endif
 #endif
 
 /* GeoTIFF VOL connector initialization */
@@ -340,8 +344,11 @@ void *geotiff_dataset_open(void *obj, const H5VL_loc_params_t __attribute__((unu
     dset->data = NULL;
     dset->data_size = 0;
     dset->is_image = 0;
+    dset->space_id = H5I_INVALID_HID;
+    dset->type_id = H5I_INVALID_HID;
 
-    if (strcmp(name, "image") == 0) {
+    /* Accept both "image" and "/image" */
+    if (strcmp(name, "image") == 0 || strcmp(name, "/image") == 0) {
         dset->is_image = 1;
 
         if (!TIFFGetField(file->tiff, TIFFTAG_IMAGEWIDTH, &width) ||
@@ -393,20 +400,54 @@ void *geotiff_dataset_open(void *obj, const H5VL_loc_params_t __attribute__((unu
 }
 
 herr_t geotiff_dataset_read(size_t __attribute__((unused)) count, void *dset[],
-                            hid_t __attribute__((unused)) mem_type_id[],
-                            hid_t __attribute__((unused)) mem_space_id[],
-                            hid_t __attribute__((unused)) file_space_id[],
+                            hid_t mem_type_id[],
+                            hid_t mem_space_id[],
+                            hid_t file_space_id[],
                             hid_t __attribute__((unused)) dxpl_id, void *buf[],
                             void __attribute__((unused)) * *req)
 {
     const geotiff_dataset_t *d = (const geotiff_dataset_t *) dset[0];
+    H5S_sel_type sel_type;
+    int ndims;
+    hsize_t file_dims[3];
+    hsize_t start[3], stride[3], count_arr[3], block[3];
 
-    if (!d || !d->data || !buf[0])
+    if (!d || !buf[0])
         return -1;
 
-    memcpy(buf[0], d->data, d->data_size);
+    /* If we have cached data and no specific selection, use the simple path */
+    if (d->data && file_space_id[0] == H5S_ALL) {
+        memcpy(buf[0], d->data, d->data_size);
+        return 0;
+    }
 
-    return 0;
+    /* Handle hyperslab selections for band reading */
+    if (file_space_id[0] != H5S_ALL && file_space_id[0] > 0) {
+        sel_type = H5Sget_select_type(file_space_id[0]);
+
+        if (sel_type == H5S_SEL_HYPERSLABS) {
+            ndims = H5Sget_simple_extent_ndims(d->space_id);
+            if (ndims < 0 || ndims > 3)
+                return -1;
+
+            H5Sget_simple_extent_dims(d->space_id, file_dims, NULL);
+
+            /* Get hyperslab selection parameters */
+            if (H5Sget_regular_hyperslab(file_space_id[0], start, stride, count_arr, block) >= 0) {
+                /* Read selected bands/region using libtiff */
+                return geotiff_read_hyperslab(d, start, stride, count_arr, block, ndims,
+                                             mem_type_id[0], buf[0]);
+            }
+        }
+    }
+
+    /* Fallback to full data read if available */
+    if (d->data) {
+        memcpy(buf[0], d->data, d->data_size);
+        return 0;
+    }
+
+    return -1;
 }
 
 // cppcheck-suppress constParameterCallback
@@ -418,10 +459,16 @@ herr_t geotiff_dataset_get(void *dset, H5VL_dataset_get_args_t *args,
 
     switch (args->op_type) {
         case H5VL_DATASET_GET_SPACE:
-            args->args.get_space.space_id = d->space_id;
+            /* Return a copy of the dataspace */
+            args->args.get_space.space_id = H5Scopy(d->space_id);
+            if (args->args.get_space.space_id < 0)
+                return -1;
             break;
         case H5VL_DATASET_GET_TYPE:
-            args->args.get_type.type_id = d->type_id;
+            /* Return a copy of the datatype */
+            args->args.get_type.type_id = H5Tcopy(d->type_id);
+            if (args->args.get_type.type_id < 0)
+                return -1;
             break;
         default:
             return -1;
@@ -565,6 +612,102 @@ herr_t geotiff_attr_close(void *attr, hid_t __attribute__((unused)) dxpl_id,
         free(a);
     }
 
+    return 0;
+}
+
+/* Helper function to read hyperslab selection (bands/regions) from GeoTIFF */
+herr_t geotiff_read_hyperslab(const geotiff_dataset_t *dset, const hsize_t *start,
+                              const hsize_t *stride, const hsize_t *count, const hsize_t *block,
+                              int ndims, hid_t __attribute__((unused)) mem_type_id, void *buf)
+{
+    geotiff_file_t *file = dset->file;
+    uint32_t width, height;
+    uint16_t samples_per_pixel, bits_per_sample, sample_format;
+    size_t elem_size;
+    tsize_t scanline_size;
+    unsigned char *scanline_buf = NULL;
+    unsigned char *output = (unsigned char *) buf;
+    hsize_t row_start, row_count, col_start, col_count, band_start, band_count;
+    uint32_t row, col;
+    hsize_t band_idx;
+
+    if (!file || !file->tiff || !buf)
+        return -1;
+
+    /* Get TIFF dimensions */
+    if (!TIFFGetField(file->tiff, TIFFTAG_IMAGEWIDTH, &width) ||
+        !TIFFGetField(file->tiff, TIFFTAG_IMAGELENGTH, &height)) {
+        return -1;
+    }
+
+    TIFFGetFieldDefaulted(file->tiff, TIFFTAG_SAMPLESPERPIXEL, &samples_per_pixel);
+    TIFFGetFieldDefaulted(file->tiff, TIFFTAG_BITSPERSAMPLE, &bits_per_sample);
+    TIFFGetFieldDefaulted(file->tiff, TIFFTAG_SAMPLEFORMAT, &sample_format);
+
+    elem_size = bits_per_sample / 8;
+    scanline_size = TIFFScanlineSize(file->tiff);
+
+    if (scanline_size <= 0 || elem_size == 0)
+        return -1;
+
+    /* Parse hyperslab parameters based on dimensionality */
+    if (ndims == 2) {
+        /* 2D: [rows, cols] */
+        row_start = start[0];
+        row_count = count[0] * block[0];
+        col_start = start[1];
+        col_count = count[1] * block[1];
+        band_start = 0;
+        band_count = samples_per_pixel;
+    } else if (ndims == 3) {
+        /* 3D: [rows, cols, bands] */
+        row_start = start[0];
+        row_count = count[0] * block[0];
+        col_start = start[1];
+        col_count = count[1] * block[1];
+        band_start = start[2];
+        band_count = count[2] * block[2];
+    } else {
+        return -1;
+    }
+
+    /* Validate selection bounds */
+    if (row_start + row_count > height || col_start + col_count > width ||
+        band_start + band_count > samples_per_pixel) {
+        return -1;
+    }
+
+    /* Allocate scanline buffer */
+    scanline_buf = (unsigned char *) malloc(scanline_size);
+    if (!scanline_buf)
+        return -1;
+
+    /* Read selected region band by band */
+    {
+    size_t output_offset = 0;
+
+    for (row = (uint32_t) row_start; row < row_start + row_count; row++) {
+        /* Read the scanline */
+        if (TIFFReadScanline(file->tiff, scanline_buf, row, 0) < 0) {
+            free(scanline_buf);
+            return -1;
+        }
+
+        /* Extract selected columns and bands */
+        for (col = (uint32_t) col_start; col < col_start + col_count; col++) {
+            for (band_idx = band_start; band_idx < band_start + band_count; band_idx++) {
+                /* Calculate position in scanline buffer */
+                size_t pixel_offset = col * samples_per_pixel * elem_size + band_idx * elem_size;
+
+                /* Copy the band data */
+                memcpy(output + output_offset, scanline_buf + pixel_offset, elem_size);
+                output_offset += elem_size;
+            }
+        }
+    }
+
+    free(scanline_buf);
+    }
     return 0;
 }
 
