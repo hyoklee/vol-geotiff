@@ -406,7 +406,6 @@ herr_t geotiff_dataset_read(size_t __attribute__((unused)) count, void *dset[], 
 {
     const geotiff_dataset_t *d = (const geotiff_dataset_t *) dset[0];
     H5S_sel_type sel_type;
-    int ndims;
     hsize_t file_dims[3];
     hsize_t start[3], stride[3], count_arr[3], block[3];
 
@@ -424,7 +423,7 @@ herr_t geotiff_dataset_read(size_t __attribute__((unused)) count, void *dset[], 
         sel_type = H5Sget_select_type(file_space_id[0]);
 
         if (sel_type == H5S_SEL_HYPERSLABS) {
-            ndims = H5Sget_simple_extent_ndims(d->space_id);
+            int ndims = H5Sget_simple_extent_ndims(d->space_id);
             if (ndims < 0 || ndims > 3)
                 return -1;
 
@@ -626,7 +625,6 @@ herr_t geotiff_read_hyperslab(const geotiff_dataset_t *dset, const hsize_t *star
     unsigned char *scanline_buf = NULL;
     unsigned char *output = (unsigned char *) buf;
     hsize_t row_start, row_count, col_start, col_count, band_start, band_count;
-    uint32_t row, col;
     hsize_t band_idx;
 
     if (!file || !file->tiff || !buf)
@@ -684,7 +682,7 @@ herr_t geotiff_read_hyperslab(const geotiff_dataset_t *dset, const hsize_t *star
     {
         size_t output_offset = 0;
 
-        for (row = (uint32_t) row_start; row < row_start + row_count; row++) {
+        for (uint32_t row = (uint32_t) row_start; row < row_start + row_count; row++) {
             /* Read the scanline */
             if (TIFFReadScanline(file->tiff, scanline_buf, row, 0) < 0) {
                 free(scanline_buf);
@@ -692,7 +690,7 @@ herr_t geotiff_read_hyperslab(const geotiff_dataset_t *dset, const hsize_t *star
             }
 
             /* Extract selected columns and bands */
-            for (col = (uint32_t) col_start; col < col_start + col_count; col++) {
+            for (uint32_t col = (uint32_t) col_start; col < col_start + col_count; col++) {
                 for (band_idx = band_start; band_idx < band_start + band_count; band_idx++) {
                     /* Calculate position in scanline buffer */
                     size_t pixel_offset =

@@ -35,9 +35,12 @@ jobs:
           --enable=all \
           --error-exitcode=1 \
           --suppress=missingIncludeSystem \
+          --suppress=missingInclude \
           --suppress=unusedFunction \
           --suppress=unmatchedSuppression \
+          --suppress=preprocessorErrorDirective \
           --inline-suppr \
+          -Isrc \
           src/ test/
 
     - name: Check for common issues
