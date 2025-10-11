@@ -399,10 +399,8 @@ void *geotiff_dataset_open(void *obj, const H5VL_loc_params_t __attribute__((unu
     return dset;
 }
 
-herr_t geotiff_dataset_read(size_t __attribute__((unused)) count, void *dset[],
-                            hid_t mem_type_id[],
-                            hid_t mem_space_id[],
-                            hid_t file_space_id[],
+herr_t geotiff_dataset_read(size_t __attribute__((unused)) count, void *dset[], hid_t mem_type_id[],
+                            hid_t mem_space_id[], hid_t file_space_id[],
                             hid_t __attribute__((unused)) dxpl_id, void *buf[],
                             void __attribute__((unused)) * *req)
 {
@@ -435,8 +433,8 @@ herr_t geotiff_dataset_read(size_t __attribute__((unused)) count, void *dset[],
             /* Get hyperslab selection parameters */
             if (H5Sget_regular_hyperslab(file_space_id[0], start, stride, count_arr, block) >= 0) {
                 /* Read selected bands/region using libtiff */
-                return geotiff_read_hyperslab(d, start, stride, count_arr, block, ndims, mem_type_id[0],
-                                              buf[0]);
+                return geotiff_read_hyperslab(d, start, stride, count_arr, block, ndims,
+                                              mem_type_id[0], buf[0]);
             }
         }
     }
@@ -697,7 +695,8 @@ herr_t geotiff_read_hyperslab(const geotiff_dataset_t *dset, const hsize_t *star
             for (col = (uint32_t) col_start; col < col_start + col_count; col++) {
                 for (band_idx = band_start; band_idx < band_start + band_count; band_idx++) {
                     /* Calculate position in scanline buffer */
-                    size_t pixel_offset = col * samples_per_pixel * elem_size + band_idx * elem_size;
+                    size_t pixel_offset =
+                        col * samples_per_pixel * elem_size + band_idx * elem_size;
 
                     /* Copy the band data */
                     memcpy(output + output_offset, scanline_buf + pixel_offset, elem_size);

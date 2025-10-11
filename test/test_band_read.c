@@ -124,7 +124,8 @@ int main(int argc, char **argv)
         printf("Failed to read full dataset\n");
     } else {
         printf("Successfully read full dataset (%zu bytes)\n", data_size);
-        printf("First few values: %u %u %u %u\n", full_data[0], full_data[1], full_data[2], full_data[3]);
+        printf("First few values: %u %u %u %u\n", full_data[0], full_data[1], full_data[2],
+               full_data[3]);
     }
 
     /* Test 2: Read a single band (if multi-band) */
@@ -152,12 +153,14 @@ int main(int argc, char **argv)
                 hsize_t mem_dims[2] = {dims[0], dims[1]};
                 mem_space_id = H5Screate_simple(2, mem_dims, NULL);
 
-                ret = H5Dread(dset_id, H5T_NATIVE_UCHAR, mem_space_id, file_space_id, H5P_DEFAULT, band_data);
+                ret = H5Dread(dset_id, H5T_NATIVE_UCHAR, mem_space_id, file_space_id, H5P_DEFAULT,
+                              band_data);
                 if (ret < 0) {
                     printf("Failed to read band 0\n");
                 } else {
                     printf("Successfully read band 0 (%zu bytes)\n", band_size);
-                    printf("First few values: %u %u %u %u\n", band_data[0], band_data[1], band_data[2], band_data[3]);
+                    printf("First few values: %u %u %u %u\n", band_data[0], band_data[1],
+                           band_data[2], band_data[3]);
                 }
 
                 H5Sclose(mem_space_id);

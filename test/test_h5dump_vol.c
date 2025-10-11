@@ -35,7 +35,7 @@ int main(int argc, char **argv)
         printf("Make sure HDF5_PLUGIN_PATH is set correctly\n");
         return 1;
     }
-    printf("✓ Successfully registered GeoTIFF VOL connector (ID: %ld)\n", (long)vol_id);
+    printf("✓ Successfully registered GeoTIFF VOL connector (ID: %ld)\n", (long) vol_id);
 
     /* Create file access property list */
     fapl_id = H5Pcreate(H5P_FILE_ACCESS);
@@ -93,7 +93,7 @@ int main(int argc, char **argv)
         H5Sget_simple_extent_dims(space_id, dims, NULL);
         printf("  Dimensions: [");
         for (int i = 0; i < ndims; i++) {
-            printf("%lu%s", (unsigned long)dims[i], (i < ndims - 1) ? ", " : "");
+            printf("%lu%s", (unsigned long) dims[i], (i < ndims - 1) ? ", " : "");
         }
         printf("]\n");
         printf("  Rank: %d\n", ndims);
@@ -107,17 +107,38 @@ int main(int argc, char **argv)
         const char *type_name = "UNKNOWN";
 
         switch (type_class) {
-            case H5T_INTEGER: type_name = "INTEGER"; break;
-            case H5T_FLOAT: type_name = "FLOAT"; break;
-            case H5T_STRING: type_name = "STRING"; break;
-            case H5T_BITFIELD: type_name = "BITFIELD"; break;
-            case H5T_OPAQUE: type_name = "OPAQUE"; break;
-            case H5T_COMPOUND: type_name = "COMPOUND"; break;
-            case H5T_REFERENCE: type_name = "REFERENCE"; break;
-            case H5T_ENUM: type_name = "ENUM"; break;
-            case H5T_VLEN: type_name = "VLEN"; break;
-            case H5T_ARRAY: type_name = "ARRAY"; break;
-            default: break;
+            case H5T_INTEGER:
+                type_name = "INTEGER";
+                break;
+            case H5T_FLOAT:
+                type_name = "FLOAT";
+                break;
+            case H5T_STRING:
+                type_name = "STRING";
+                break;
+            case H5T_BITFIELD:
+                type_name = "BITFIELD";
+                break;
+            case H5T_OPAQUE:
+                type_name = "OPAQUE";
+                break;
+            case H5T_COMPOUND:
+                type_name = "COMPOUND";
+                break;
+            case H5T_REFERENCE:
+                type_name = "REFERENCE";
+                break;
+            case H5T_ENUM:
+                type_name = "ENUM";
+                break;
+            case H5T_VLEN:
+                type_name = "VLEN";
+                break;
+            case H5T_ARRAY:
+                type_name = "ARRAY";
+                break;
+            default:
+                break;
         }
 
         printf("  Datatype: %s (%zu bytes)\n", type_name, type_size);
@@ -132,7 +153,7 @@ int main(int argc, char **argv)
         }
 
         size_t sample_size = (total_elements < 10) ? total_elements : 10;
-        unsigned char *data = (unsigned char *)malloc(sample_size);
+        unsigned char *data = (unsigned char *) malloc(sample_size);
 
         if (data) {
             /* Create memory space for sample */
@@ -152,8 +173,10 @@ int main(int argc, char **argv)
             }
 
             hid_t file_space_sel = H5Scopy(space_id);
-            if (H5Sselect_hyperslab(file_space_sel, H5S_SELECT_SET, start, NULL, count, NULL) >= 0) {
-                if (H5Dread(dset_id, H5T_NATIVE_UCHAR, mem_space, file_space_sel, H5P_DEFAULT, data) >= 0) {
+            if (H5Sselect_hyperslab(file_space_sel, H5S_SELECT_SET, start, NULL, count, NULL) >=
+                0) {
+                if (H5Dread(dset_id, H5T_NATIVE_UCHAR, mem_space, file_space_sel, H5P_DEFAULT,
+                            data) >= 0) {
                     printf("  Sample data (first %zu values): [", sample_size);
                     for (size_t i = 0; i < sample_size; i++) {
                         printf("%u%s", data[i], (i < sample_size - 1) ? ", " : "");
