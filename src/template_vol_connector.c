@@ -400,7 +400,7 @@ void *geotiff_dataset_open(void *obj, const H5VL_loc_params_t __attribute__((unu
 }
 
 herr_t geotiff_dataset_read(size_t __attribute__((unused)) count, void *dset[], hid_t mem_type_id[],
-                            hid_t mem_space_id[], hid_t file_space_id[],
+                            hid_t __attribute__((unused)) mem_space_id[], hid_t file_space_id[],
                             hid_t __attribute__((unused)) dxpl_id, void *buf[],
                             void __attribute__((unused)) * *req)
 {
@@ -614,8 +614,9 @@ herr_t geotiff_attr_close(void *attr, hid_t __attribute__((unused)) dxpl_id,
 
 /* Helper function to read hyperslab selection (bands/regions) from GeoTIFF */
 herr_t geotiff_read_hyperslab(const geotiff_dataset_t *dset, const hsize_t *start,
-                              const hsize_t *stride, const hsize_t *count, const hsize_t *block,
-                              int ndims, hid_t __attribute__((unused)) mem_type_id, void *buf)
+                              const hsize_t __attribute__((unused)) * stride, const hsize_t *count,
+                              const hsize_t *block, int ndims,
+                              hid_t __attribute__((unused)) mem_type_id, void *buf)
 {
     geotiff_file_t *file = dset->file;
     uint32_t width, height;
