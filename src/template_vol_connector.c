@@ -435,8 +435,8 @@ herr_t geotiff_dataset_read(size_t __attribute__((unused)) count, void *dset[],
             /* Get hyperslab selection parameters */
             if (H5Sget_regular_hyperslab(file_space_id[0], start, stride, count_arr, block) >= 0) {
                 /* Read selected bands/region using libtiff */
-                return geotiff_read_hyperslab(d, start, stride, count_arr, block, ndims,
-                                             mem_type_id[0], buf[0]);
+                return geotiff_read_hyperslab(d, start, stride, count_arr, block, ndims, mem_type_id[0],
+                                              buf[0]);
             }
         }
     }
