@@ -684,29 +684,29 @@ herr_t geotiff_read_hyperslab(const geotiff_dataset_t *dset, const hsize_t *star
 
     /* Read selected region band by band */
     {
-    size_t output_offset = 0;
+        size_t output_offset = 0;
 
-    for (row = (uint32_t) row_start; row < row_start + row_count; row++) {
-        /* Read the scanline */
-        if (TIFFReadScanline(file->tiff, scanline_buf, row, 0) < 0) {
-            free(scanline_buf);
-            return -1;
-        }
+        for (row = (uint32_t) row_start; row < row_start + row_count; row++) {
+            /* Read the scanline */
+            if (TIFFReadScanline(file->tiff, scanline_buf, row, 0) < 0) {
+                free(scanline_buf);
+                return -1;
+            }
 
-        /* Extract selected columns and bands */
-        for (col = (uint32_t) col_start; col < col_start + col_count; col++) {
-            for (band_idx = band_start; band_idx < band_start + band_count; band_idx++) {
-                /* Calculate position in scanline buffer */
-                size_t pixel_offset = col * samples_per_pixel * elem_size + band_idx * elem_size;
+            /* Extract selected columns and bands */
+            for (col = (uint32_t) col_start; col < col_start + col_count; col++) {
+                for (band_idx = band_start; band_idx < band_start + band_count; band_idx++) {
+                    /* Calculate position in scanline buffer */
+                    size_t pixel_offset = col * samples_per_pixel * elem_size + band_idx * elem_size;
 
-                /* Copy the band data */
-                memcpy(output + output_offset, scanline_buf + pixel_offset, elem_size);
-                output_offset += elem_size;
+                    /* Copy the band data */
+                    memcpy(output + output_offset, scanline_buf + pixel_offset, elem_size);
+                    output_offset += elem_size;
+                }
             }
         }
-    }
 
-    free(scanline_buf);
+        free(scanline_buf);
     }
     return 0;
 }
