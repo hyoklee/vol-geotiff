@@ -1,35 +1,30 @@
-# HDF5 VOL Connector for GeoTIFF
+# HDF5 VOL Connector for GeoTIFF 0.1.0
 
-[![CI](https://github.com/hyoklee/vol-geotiff/workflows/CI/badge.svg)](https://github.com/hyoklee/vol-geotiff/actions/workflows/ci.yml)
-[![Code Quality](https://github.com/hyoklee/vol-geotiff/workflows/Code%20Quality/badge.svg)](https://github.com/hyoklee/vol-geotiff/actions/workflows/code-quality.yml)
-[![Documentation](https://github.com/hyoklee/vol-geotiff/workflows/Documentation/badge.svg)](https://github.com/hyoklee/vol-geotiff/actions/workflows/docs.yml)
-[![License](https://img.shields.io/badge/License-HDF5-blue.svg)](COPYING)
+[![CI](https://github.com/LifeBoatLLC/DataFormats-VOLS/workflows/CI/badge.svg)](https://github.com/LifeBoatLLC/DataFormats-VOLS/actions/workflows/ci.yml)
+[![Code Quality](https://github.com/LifeBoatLLC/DataFormats-VOLS/workflows/Code%20Quality/badge.svg)](https://github.com/LifeBoatLLC/DataFormats-VOLS/actions/workflows/code-quality.yml)
+[![Documentation](https://github.com/LifeBoatLLC/DataFormats-VOLS/workflows/Documentation/badge.svg)](https://github.com/LifeBoatLLC/DataFormats-VOLS/actions/workflows/docs.yml)
+[![License](https://img.shields.io/badge/License-Lifeboat-blue.svg)](COPYING)
 
-This project implements an HDF5 Virtual Object Layer (VOL) connector that enables reading GeoTIFF files through HDF5 tools and netCDF-C. This allows users to access GeoTIFF data using familiar HDF5 tools like h5dump, h5ls, and netCDF tools like ncdump.
+This project implements an HDF5 Virtual Object Layer (VOL) connector that enables read-only operations on GeoTIFF files through HDF5 tools and netCDF-C. This allows users to access GeoTIFF data using familiar HDF5 tools like h5dump, h5ls, and netCDF tools like ncdump.
 
 ## Features
 
 - **GeoTIFF File Access**: Read GeoTIFF files through the HDF5 API
 - **Image Data Access**: Access raster image data as HDF5 datasets
-- **Metadata Extraction**: Parse and expose GeoTIFF spatial metadata
 - **HDF5 Tool Compatibility**: Use h5dump, h5ls, h5stat with GeoTIFF files
 - **netCDF-C Compatibility**: Use ncdump and other netCDF tools with GeoTIFF files
-- **Multiple Data Types**: Support for various TIFF data types (uint8, uint16, uint32, float32, float64)
+
+- **(TBD) Metadata Extraction**: Parse and expose GeoTIFF spatial metadata
 
 ## Architecture
 
-The GeoTIFF VOL connector maps GeoTIFF file structure to HDF5 concepts:
-
-- **File**: GeoTIFF file (.tif/.tiff)
-- **Root Group**: "/" represents the file root
-- **Image Dataset**: "/image" contains the raster data
-- **Attributes**: GeoTIFF metadata (coordinate system, geo-referencing, etc.)
+See the work-in-progress architecture.md file for the mapping between GeoTIFF file structure and HDF5 concepts.
 
 ## Dependencies
 
-You will need the following to build the GeoTIFF VOL connector:
+The GeoTIFF VOL connector has the following dependencies:
 
-- **HDF5 develop branch (1.15+/2.x)** with VOL support
+- **HDF5 develop branch (1.14+/2.x)** with VOL support
 - **libtiff** (TIFF library)
 - **libgeotiff** (GeoTIFF library)
 - **CMake 3.9 or later**
@@ -59,7 +54,7 @@ brew install cmake pkg-config libtiff libgeotiff
 
 ## Building
 
-This project uses CMake as the build system. Autotools support has been removed to simplify the build process and maintenance.
+This project uses CMake as the build system. 
 
 ### CMake Build
 1. Create a build directory:
@@ -67,16 +62,34 @@ This project uses CMake as the build system. Autotools support has been removed 
    mkdir build && cd build
    ```
 
-2. Configure with CMake (point to HDF5 develop install):
+2. Configure with CMake (point to HDF5 install):
+   ```bash
+   cmake .. -DCMAKE_PREFIX_PATH=/opt/hdf5/
+   ```
 
-4. Run tests:
+   Or specify HDF5 location explicitly:
+   ```bash
+   cmake .. -DHDF5_DIR=/opt/hdf5/install
+   ```
+
+3. Build the connector:
+   ```bash
+   make -j$(nproc)
+   ```
+
+4. (Optional) Install the connector:
+   ```bash
+   sudo make install
+   ```
+
+5. Run tests:
    ```bash
    make test
    ```
 
 ### Alternative CMake Configuration
 
-This project requires HDF5 develop (1.15+/2.x). Ensure your `CMAKE_PREFIX_PATH` and/or `HDF5_DIR` point to that install.
+This project requires HDF5 develop (1.14+/2.x). Ensure your `CMAKE_PREFIX_PATH` and/or `HDF5_DIR` point to that install.
 
 ## Usage
 
@@ -84,7 +97,7 @@ This project requires HDF5 develop (1.15+/2.x). Ensure your `CMAKE_PREFIX_PATH` 
 
 Set the HDF5 plugin path to include the built connector:
 ```bash
-export HDF5_PLUGIN_PATH=/path/to/vol-geotiff/build/src
+export HDF5_PLUGIN_PATH=/path/to/DataFormats-VOLS/build/src
 ```
 
 ### Using with HDF5 Tools
@@ -124,11 +137,15 @@ ncdump -v image sample.tif
 ### Programming Interface
 
 ```c
-#include "template_vol_connector.h"
+#include "geotiff_vol_connector.h"
 #include <hdf5.h>
 
 int main() {
     hid_t vol_id, fapl_id, file_id, dset_id;
+
+    // Tell the library where to find the GeoTIFF VOL connector library
+    // (May be skipped if HDF5_VOL_CONNECTOR/HDF5_PLUGIN_PATH are defined in env)
+    H5PLappend(GEOTIFF_VOL_PLUGIN_PATH);
 
     // Register the GeoTIFF VOL connector
     vol_id = H5VLregister_connector_by_name(GEOTIFF_VOL_CONNECTOR_NAME, H5P_DEFAULT);
@@ -157,117 +174,34 @@ int main() {
 
 ## Supported GeoTIFF Features
 
-### Image Data
-- Multiple bit depths (8, 16, 32, 64 bit)
-- Multiple sample formats (unsigned int, signed int, floating point)
-- Single and multi-band images
-- Various compression schemes (through libtiff)
+- Single-image files with grayscale/RGB images
 
-### Spatial Metadata
-- Coordinate Reference Systems (CRS)
-- Geotransformation parameters
-- Tie points and pixel scale
-- Geographic and projected coordinate systems
-- Datum and ellipsoid information
+- (TBD) Multiple bit depths
+- (TBD) Multiple sample formats (unsigned int, signed int, floating point)
+- (TBD) Single and multi-band images
+- (TBD) Various compression schemes (through libtiff)
 
-### Limitations
-- **Read-only**: The connector only supports reading GeoTIFF files
-- **Single image**: Only the primary image is exposed as a dataset
-- **Memory usage**: Large images are loaded entirely into memory
-- **Complex projections**: Some advanced GeoTIFF features may not be fully supported
+### (TBD) Spatial Metadata
+- (TBD) Coordinate Reference Systems (CRS)
+- (TBD) Geotransformation parameters
+- (TBD) Tie points and pixel scale
+- (TBD) Geographic and projected coordinate systems
+- (TBD) Datum and ellipsoid information
 
 ## Testing
 
 The project includes several test programs:
 
-1. **vol_plugin**: Basic VOL connector registration test
-2. **test_geotiff_read**: GeoTIFF-specific functionality test
-3. **test_h5tools.sh**: HDF5 tools integration test
-4. **test_ncdump.sh**: netCDF tools integration test
+1. **test_runner**: GeoTIFF-specific functionality tests, run by make test/ctest
+2. (WIP) **test_ncdump**: netCDF tools integration test
+3. (WIP) **test_h5tools.sh**: HDF5 tools integration test
 
-Run tests with a sample GeoTIFF file:
+Or run tests with a sample GeoTIFF file:
 ```bash
 cd test
-./test_geotiff_read sample.tif
-./test_h5tools.sh
-./test_ncdump.sh
-```
-
-## Troubleshooting
-
-### Plugin Not Found
-- Ensure `HDF5_PLUGIN_PATH` is set correctly
-- Verify the shared library was built successfully
-- Check that HDF5 was compiled with plugin support
-
-### Library Dependencies
-- Ensure libtiff and libgeotiff are properly installed
-- Check that pkg-config can find the required libraries
-- Verify library versions are compatible
-
-### Runtime Errors
-- Check that the GeoTIFF file is valid and accessible
-- Ensure sufficient memory for large images
-- Verify HDF5 version is the develop branch (1.15+/2.x)
-
-## Development and CI/CD
-
-This project uses GitHub Actions for continuous integration and deployment:
-
-### Automated Testing
-- **CI Workflow**: Tests on Ubuntu (and macOS as applicable) with HDF5 develop only
-- **Code Quality**: Static analysis, formatting checks, and security scans
-- **Comprehensive Testing**: Weekly extensive testing across different configurations
-- **Documentation**: Automatic API documentation generation and deployment
-
-### Workflows
-- `.github/workflows/ci.yml` - Main CI pipeline
-- `.github/workflows/code-quality.yml` - Code quality checks
-- `.github/workflows/docs.yml` - Documentation generation
-- `.github/workflows/release.yml` - Automated releases
-- `.github/workflows/comprehensive-test.yml` - Extended testing (HDF5 develop only)
-
-### Development Process
-1. All pull requests must pass CI checks
-2. Code formatting is enforced via clang-format
-3. Static analysis must pass without warnings
-4. New features require tests and documentation
-5. Releases are automatically built and published
-
-## Contributing
-
-Contributions are welcome! Please:
-
-1. Fork the repository
-2. Create a feature branch
-3. Add tests for new functionality
-4. Ensure all CI checks pass
-5. Update documentation as needed
-6. Submit a pull request
-
-### Local Development
-```bash
-# Install pre-commit hooks (recommended)
-pip install pre-commit
-pre-commit install
-
-# Run tests locally
-mkdir build && cd build
-cmake ..
-make
-make test
-
-# Run code formatting
-clang-format -i src/*.c src/*.h test/*.c test/*.h
-```
-
-### Pre-commit on Windows (PowerShell)
-```powershell
-# One-time setup: installs pre-commit and installs git hook
-scripts/setup-precommit.ps1 -Install
-
-# Run hooks on all files
-pre-commit run --all-files
+./test_runner 
+(WIP) ./test_h5tools.sh <GeoTIFF filename>
+(WIP) ./test_ncdump.sh <GeoTIFF filename>
 ```
 
 ## License

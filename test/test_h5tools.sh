@@ -4,26 +4,42 @@
 
 echo "Testing HDF5 tools with GeoTIFF VOL connector"
 
-# Set plugin path
-export HDF5_PLUGIN_PATH="../src"
-
-# Test file (should be a GeoTIFF file)
-GEOTIFF_FILE="sample.tif"
-
-if [ ! -f "$GEOTIFF_FILE" ]; then
-    echo "Creating a simple test GeoTIFF file..."
-    # This would need GDAL or similar tools to create a proper GeoTIFF
-    echo "Please provide a GeoTIFF file named $GEOTIFF_FILE for testing"
+# Check if being run from build directory
+if [ ! -d "./src" ]; then
+    echo "Error: This script must be run from the build directory"
+    echo "Usage: cd build && ../test/test_h5tools.sh <geotiff_file.tif>"
     exit 1
 fi
 
-echo "Testing h5ls with GeoTIFF file: $GEOTIFF_FILE"
-h5ls --vol-name=geotiff_vol_connector "$GEOTIFF_FILE" || echo "h5ls failed"
+# Check if filename argument is provided
+if [ -z "$1" ]; then
+    echo "Usage: $0 <geotiff_file.tif>"
+    exit 1
+fi
 
-echo "Testing h5dump with GeoTIFF file: $GEOTIFF_FILE"
-h5dump --vol-name=geotiff_vol_connector "$GEOTIFF_FILE" || echo "h5dump failed"
+# Validate that the filename ends with .tif
+if [[ ! "$1" =~ \.tif$ ]]; then
+    echo "Error: Filename must end with .tif"
+    exit 1
+fi
 
-echo "Testing h5stat with GeoTIFF file: $GEOTIFF_FILE"
-h5stat --vol-name=geotiff_vol_connector "$GEOTIFF_FILE" || echo "h5stat failed"
+# Check if file exists
+if [ ! -f "$1" ]; then
+    echo "Error: File '$1' not found"
+    exit 1
+fi
+
+# Set plugin path for HDF5 VOL connector using absolute path
+export HDF5_PLUGIN_PATH="$(cd ./src && pwd)"
+
+echo "Using HDF5_PLUGIN_PATH: $HDF5_PLUGIN_PATH"
+echo "Testing h5ls with GeoTIFF file: $1"
+h5ls --vol-name=geotiff_vol_connector "$1" || echo "h5ls failed"
+
+echo "Testing h5dump with GeoTIFF file: $1"
+h5dump --vol-name=geotiff_vol_connector "$1" || echo "h5dump failed"
+
+echo "Testing h5stat with GeoTIFF file: $1"
+h5stat --vol-name=geotiff_vol_connector "$1" || echo "h5stat failed"
 
 echo "HDF5 tools testing completed"
