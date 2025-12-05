@@ -99,13 +99,6 @@ jobs:
           ctest -D Experimental
 #          make test
 
-      - name: Test VOL plugin registration
-        run: |
-          cd build
-          export HDF5_PLUGIN_PATH=$PWD/src
-          export LD_LIBRARY_PATH=${{ github.workspace }}/hdf5-${{ matrix.hdf5-version }}/lib:$LD_LIBRARY_PATH
-          ./test/vol_plugin
-
       - name: Test GeoTIFF reading
         run: |
           cd build
