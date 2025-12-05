@@ -24,6 +24,18 @@ int main(int argc, char **argv)
     const char *test_name = (argc > 1) ? argv[1] : "all";
     int run_all = (strcmp(test_name, "all") == 0);
 
+    /* Handle real_file_test with filename parameter */
+    if (strcmp(test_name, "real_file_test") == 0) {
+        if (argc < 3) {
+            printf("Error: real_file_test requires a filename argument\n");
+            printf("Usage: %s real_file_test <filename>\n", argv[0]);
+            return 1;
+        }
+        const char *filename = argv[2];
+        printf("Running real file test on: %s\n\n", filename);
+        return RealFileComprehensiveTest(filename) != 0 ? 1 : 0;
+    }
+
     /* Generate test files first (always needed) */
     printf("Generating test GeoTIFF files...\n");
     if (CreateGrayscaleGeoTIFF(GRAYSCALE_FILENAME) != 0) {
@@ -124,6 +136,27 @@ int main(int argc, char **argv)
 
     if (run_all || strcmp(test_name, "tiled_read_rgb") == 0)
         num_failures += (TiledTIFFReadTest("test_tiled_rgb.tif", 1) != 0 ? 1 : 0);
+
+    /* Coordinates attribute tests */
+    if (run_all || strcmp(test_name, "coordinates_attr_geographic") == 0)
+        num_failures += (CoordinatesAttributeGeographicTest(NULL) != 0 ? 1 : 0);
+
+    if (run_all || strcmp(test_name, "coordinates_attr_projected") == 0)
+        num_failures += (CoordinatesAttributeProjectedTest(NULL) != 0 ? 1 : 0);
+
+    /* Reference counting tests */
+    if (run_all || strcmp(test_name, "refcount_close_file_before_dataset") == 0)
+        num_failures += (RefCountCloseFileBeforeDatasetTest(GRAYSCALE_FILENAME) != 0 ? 1 : 0);
+
+    if (run_all || strcmp(test_name, "refcount_close_dataset_before_attribute") == 0)
+        num_failures += (RefCountCloseDatasetBeforeAttributeTest() != 0 ? 1 : 0);
+
+    if (run_all || strcmp(test_name, "refcount_close_file_with_multiple_children") == 0)
+        num_failures +=
+            (RefCountCloseFileWithMultipleChildrenTest(GRAYSCALE_FILENAME) != 0 ? 1 : 0);
+
+    if (run_all || strcmp(test_name, "num_images_attribute") == 0)
+        num_failures += (NumImagesAttributeTest() != 0 ? 1 : 0);
 
     if (num_failures == 0) {
         printf("\n%s: All tests completed successfully\n", test_name);

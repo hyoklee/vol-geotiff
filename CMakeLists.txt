@@ -52,6 +52,12 @@ endif()
 # wrong. Turn this on for added confirmation that you got it right.
 #message (DEPRECATION "Include: ${HDF5_INCLUDE_DIR}")
 
+# Build options
+option (GEOTIFF_BUILD_EXAMPLES "Build example programs" ON)
+
 add_subdirectory (src)
 add_subdirectory (test)
-add_subdirectory (examples)
+
+if (GEOTIFF_BUILD_EXAMPLES)
+    add_subdirectory (examples)
+endif()

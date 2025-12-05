@@ -15,9 +15,12 @@ endif()
 
 # Add the GeoTIFF test (if a sample GeoTIFF file exists)
 if(EXISTS "${PROJECT_SOURCE_DIR}/test/sample.tif")
-    add_test (test_runner_read test_runner "${PROJECT_SOURCE_DIR}/test/sample.tif")
-    set_tests_properties(test_runner_read PROPERTIES
-        ENVIRONMENT "HDF5_PLUGIN_PATH=${PROJECT_BINARY_DIR}/src")
+    add_test(NAME test_runner_read
+             COMMAND ${CMAKE_COMMAND} -E env
+                     "HDF5_PLUGIN_PATH=${PROJECT_BINARY_DIR}/src/Release\;${PROJECT_BINARY_DIR}/src"
+                     "PATH=C:/src/hdf5-dev/install/bin\;C:/src/vcpkg.microsoft/installed/x64-windows/bin\;$ENV{PATH}"
+                     "HDF5_VOL_CONNECTOR="
+                     $<TARGET_FILE:test_runner> real_file_test "${PROJECT_SOURCE_DIR}/test/sample.tif")
 endif()
 
 # Add individual test cases
@@ -100,3 +103,74 @@ set_tests_properties(tiled_read_grayscale PROPERTIES ENVIRONMENT "${TEST_ENVIRON
 
 add_test(NAME tiled_read_rgb COMMAND test_runner tiled_read_rgb)
 set_tests_properties(tiled_read_rgb PROPERTIES ENVIRONMENT "${TEST_ENVIRONMENT}")
+
+# Reference counting tests
+add_test(NAME refcount_close_file_before_dataset COMMAND test_runner refcount_close_file_before_dataset)
+set_tests_properties(refcount_close_file_before_dataset PROPERTIES ENVIRONMENT "${TEST_ENVIRONMENT}")
+
+add_test(NAME refcount_close_dataset_before_attribute COMMAND test_runner refcount_close_dataset_before_attribute)
+set_tests_properties(refcount_close_dataset_before_attribute PROPERTIES ENVIRONMENT "${TEST_ENVIRONMENT}")
+
+add_test(NAME refcount_close_file_with_multiple_children COMMAND test_runner refcount_close_file_with_multiple_children)
+set_tests_properties(refcount_close_file_with_multiple_children PROPERTIES ENVIRONMENT "${TEST_ENVIRONMENT}")
+
+add_test(NAME num_images_attribute COMMAND test_runner num_images_attribute)
+set_tests_properties(num_images_attribute PROPERTIES ENVIRONMENT "${TEST_ENVIRONMENT}")
+
+# Real file comprehensive test
+add_test(NAME real_file_comprehensive COMMAND test_runner real_file_comprehensive)
+set_tests_properties(real_file_comprehensive PROPERTIES ENVIRONMENT "${TEST_ENVIRONMENT}")
+
+# GDAL test files - individual CTest instances for each .tif file
+set(GDAL_TEST_FILES
+    "3376.tif"
+    "arcgis_geodataxform_coeffx_coeffy.tif"
+    "bigtiff_four_strip_be_short.tif"
+    "bigtiff_four_strip_short.tif"
+    "bigtiff_one_strip_long.tif"
+    "byte_gcp.tif"
+    "byte_inconsistent_georef.tif"
+    "byte_nogeoref.tif"
+    "byte_point.tif"
+    "byte.tif"
+    "byte_with_ovr.tif"
+    "byte_zstd.tif"
+    # "cielab.tif" # colorpsace ot yet supported
+    # "float32.tif" # floats not yet supported
+    # "float64.tif" # floats not yet supported
+    "GTModelTypeGeoKey_only.tif"
+    "int16.tif"
+    "int32.tif"
+    "int64.tif"
+    # "minfloat.tif" # floats not yet supported
+    "ModelTiepointTag_z_non_zero_but_ModelPixelScaleTag_z_zero.tif"
+    "PIA26616.tif"
+    "stefan_full_greyalpha.tif"
+    "stefan_full_rgba.tif"
+    # "test_average_palette.tif" # palette color model not supported
+    "uint16.tif"
+    "uint32.tif"
+    "uint64.tif"
+    "utmsmall.tif"
+    "WGS_1984_Web_Mercator_Auxiliary_Sphere.tif"
+    "WGS_1984_Web_Mercator.tif"
+)
+
+foreach(TEST_FILE ${GDAL_TEST_FILES})
+    # Get filename without extension for test name
+    string(REPLACE ".tif" "" TEST_NAME_BASE "${TEST_FILE}")
+    # Replace any special characters that might cause issues with underscores
+    string(REGEX REPLACE "[^a-zA-Z0-9_]" "_" TEST_NAME_SAFE "${TEST_NAME_BASE}")
+    set(TEST_NAME "gdal_${TEST_NAME_SAFE}")
+
+    # Check if file exists in test directory
+    if(EXISTS "${PROJECT_SOURCE_DIR}/test/${TEST_FILE}")
+        # Create a wrapper test that calls test_runner with the real_file_test and filename
+        add_test(NAME ${TEST_NAME}
+                 COMMAND ${CMAKE_COMMAND} -E env
+                         "HDF5_PLUGIN_PATH=${PROJECT_BINARY_DIR}/src/Release\;${PROJECT_BINARY_DIR}/src"
+                         "PATH=C:/src/hdf5-dev/install/bin\;C:/src/vcpkg.microsoft/installed/x64-windows/bin\;$ENV{PATH}"
+                         "HDF5_VOL_CONNECTOR="
+                         $<TARGET_FILE:test_runner> real_file_test "${PROJECT_SOURCE_DIR}/test/${TEST_FILE}")
+    endif()
+endforeach()

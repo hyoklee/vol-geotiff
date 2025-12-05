@@ -1,7 +1,7 @@
-Copyright Notice and License Terms for HDF5 VOL Connector Template
+Copyright Notice and License Terms for HDF5 VOL GeoTIFF Connector
 -----------------------------------------------------------------------------
 
-Copyright (c) 2019, The HDF Group. 
+Copyright (c) 2025, Lifeboat, LLC
 
 All rights reserved.
 
@@ -16,9 +16,9 @@ provided that the following conditions are met:
    this list of conditions, and the following disclaimer in the documentation 
    and/or materials provided with the distribution.
 
-3. Neither the name of The HDF Group nor the name of any Contributor may be
+3. Neither the name of Lifeboat nor the name of any Contributor may be
    used to endorse or promote products derived from this software without
-   specific prior written permission from The HDF Group, or the Contributor,
+   specific prior written permission from Lifeboat or the Contributor,
    respectively.
 
 DISCLAIMER: 
@@ -31,7 +31,7 @@ ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 You are under no obligation whatsoever to provide any bug fixes, patches, or 
 upgrades to the features, functionality or performance of the source code 
 ("Enhancements") to anyone; however, if you choose to make your Enhancements 
-available either publicly, or directly to The HDF Group, without imposing a 
+available either publicly, or directly to Lifeboat, LLC, without imposing a 
 separate written license agreement for such Enhancements, then you hereby 
 grant the following license: a non-exclusive, royalty-free perpetual license 
 to install, use, modify, prepare derivative works, incorporate into other 

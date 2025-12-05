@@ -233,38 +233,27 @@ int create_gnuplot_script(hsize_t height, hsize_t width)
     fprintf(fp, "#!/usr/bin/gnuplot\n");
     fprintf(fp, "# GeoTIFF VOL Connector Visualization\n\n");
 
-    fprintf(fp, "set terminal png size 1400,600\n");
+    fprintf(fp, "set terminal png truecolor size %zu,%zu\n", width * 3, height * 3);
     fprintf(fp, "set output 'gnuplot_visualization.png'\n\n");
 
-    fprintf(fp, "set multiplot layout 1,2 title 'GeoTIFF accessed via HDF5 VOL Connector' font ',16'\n\n");
-
-    /* Plot 1: Red channel as intensity map */
-    fprintf(fp, "# Red Channel\n");
-    fprintf(fp, "set title 'Red Channel' font ',12'\n");
+    /* Plot RGB color image */
+    fprintf(fp, "# RGB Color Image\n");
+    fprintf(fp, "set title 'GeoTIFF accessed via HDF5 VOL Connector' font ',14'\n");
     fprintf(fp, "set xlabel 'X (pixels)'\n");
     fprintf(fp, "set ylabel 'Y (pixels)'\n");
     fprintf(fp, "set size ratio -1\n");
     fprintf(fp, "set xrange [0:%zu]\n", width - 1);
     fprintf(fp, "set yrange [%zu:0]\n", height - 1);
-    fprintf(fp, "set palette defined (0 'black', 128 'red', 255 'yellow')\n");
-    fprintf(fp, "set cbrange [0:255]\n");
-    fprintf(fp, "set cblabel 'Intensity (0-255)'\n");
-    fprintf(fp, "plot '%s' using 1:2:3 with image notitle\n\n", GNUPLOT_RGB_DATA);
-
-    /* Plot 2: Green channel intensity */
-    fprintf(fp, "# Green Channel\n");
-    fprintf(fp, "set title 'Green Channel' font ',12'\n");
-    fprintf(fp, "set xlabel 'X (pixels)'\n");
-    fprintf(fp, "set ylabel 'Y (pixels)'\n");
-    fprintf(fp, "set size ratio -1\n");
-    fprintf(fp, "set xrange [0:%zu]\n", width - 1);
-    fprintf(fp, "set yrange [%zu:0]\n", height - 1);
-    fprintf(fp, "set palette defined (0 'black', 128 'green', 255 'cyan')\n");
-    fprintf(fp, "set cbrange [0:255]\n");
-    fprintf(fp, "set cblabel 'Intensity (0-255)'\n");
-    fprintf(fp, "plot '%s' using 1:2:4 with image notitle\n\n", GNUPLOT_RGB_DATA);
-
-    fprintf(fp, "unset multiplot\n");
+    fprintf(fp, "unset colorbox\n");
+    fprintf(fp, "unset border\n");
+    fprintf(fp, "unset xtics\n");
+    fprintf(fp, "unset ytics\n");
+    fprintf(fp, "unset grid\n");
+    fprintf(fp, "set lmargin at screen 0.05\n");
+    fprintf(fp, "set rmargin at screen 0.95\n");
+    fprintf(fp, "set bmargin at screen 0.05\n");
+    fprintf(fp, "set tmargin at screen 0.90\n");
+    fprintf(fp, "plot '%s' using 1:2:3:4:5 with rgbimage pixels notitle\n", GNUPLOT_RGB_DATA);
 
     fclose(fp);
 
@@ -316,7 +305,7 @@ int visualize_with_gnuplot(unsigned char *data, hsize_t height, hsize_t width)
     return 0;
 }
 
-int main(void)
+int main(int argc, char *argv[])
 {
     hid_t vol_id, fapl_id, file_id;
     hid_t dset_id, space_id;
@@ -326,11 +315,35 @@ int main(void)
     char plugin_path[PATH_MAX];
     char cwd[PATH_MAX];
     unsigned char *data = NULL;
+    const char *input_filename = NULL;
+    int create_demo = 1;
+
+    /* Parse command line arguments */
+    if (argc > 2) {
+        printf("Usage: %s [tiff_file]\n", argv[0]);
+        printf("  If no file specified, creates and visualizes demo concentric rings\n");
+        printf("  If file specified, visualizes that GeoTIFF file\n");
+        return 1;
+    }
+
+    if (argc == 2) {
+        input_filename = argv[1];
+        create_demo = 0;
+
+        /* Check if file exists */
+        if (stat(input_filename, &st) != 0) {
+            printf("ERROR: File not found: %s\n", input_filename);
+            return 1;
+        }
+    } else {
+        input_filename = OUTPUT_FILENAME;
+        create_demo = 1;
+    }
 
     /* Check if being run from build directory */
     if (stat("./src", &st) != 0 || !S_ISDIR(st.st_mode)) {
         printf("ERROR: This program must be run from the build directory\n");
-        printf("Usage: cd build && ./examples/_tmp_gnuplot_demo\n");
+        printf("Usage: cd build && ./examples/gnuplot_demo [tiff_file]\n");
         return 1;
     }
 
@@ -356,16 +369,20 @@ int main(void)
     printf("GeoTIFF VOL Connector gnuplot Demo\n");
     printf("===========================================\n\n");
 
-    /* Step 1: Create demo GeoTIFF */
-    printf("[1/3] Creating demo GeoTIFF file\n");
-    if (create_demo_image() != 0) {
-        printf("ERROR: Failed to create demo GeoTIFF file\n");
-        return 1;
+    /* Step 1: Create demo GeoTIFF if needed */
+    if (create_demo) {
+        printf("[1/3] Creating demo GeoTIFF file\n");
+        if (create_demo_image() != 0) {
+            printf("ERROR: Failed to create demo GeoTIFF file\n");
+            return 1;
+        }
+        printf("\n");
+    } else {
+        printf("Input file: %s\n\n", input_filename);
     }
-    printf("\n");
 
     /* Step 2: Read via VOL connector */
-    printf("[2/3] Reading GeoTIFF via HDF5 VOL connector\n");
+    printf("[%s] Reading GeoTIFF via HDF5 VOL connector\n", create_demo ? "2/3" : "1/2");
 
     /* Register the GeoTIFF VOL connector */
     vol_id = H5VLregister_connector_by_name(GEOTIFF_VOL_CONNECTOR_NAME, H5P_DEFAULT);
@@ -393,14 +410,14 @@ int main(void)
     }
 
     /* Open the GeoTIFF file */
-    file_id = H5Fopen(OUTPUT_FILENAME, H5F_ACC_RDONLY, fapl_id);
+    file_id = H5Fopen(input_filename, H5F_ACC_RDONLY, fapl_id);
     if (file_id < 0) {
-        printf("ERROR: Failed to open GeoTIFF file\n");
+        printf("ERROR: Failed to open GeoTIFF file: %s\n", input_filename);
         H5Pclose(fapl_id);
         H5VLunregister_connector(vol_id);
         return 1;
     }
-    printf("Opened GeoTIFF file via VOL connector\n");
+    printf("Opened GeoTIFF file via VOL connector: %s\n", input_filename);
 
     /* Open the image dataset */
     dset_id = H5Dopen2(file_id, "/image0", H5P_DEFAULT);
@@ -467,7 +484,7 @@ int main(void)
     printf("\n");
 
     /* Step 3: Visualize with gnuplot */
-    printf("[3/3] Visualizing data\n");
+    printf("[%s] Visualizing data\n", create_demo ? "3/3" : "2/2");
     int viz_ret = visualize_with_gnuplot(data, dims[0], dims[1]);
 
     /* Clean up */
@@ -483,7 +500,9 @@ int main(void)
         printf("Demo completed successfully!\n");
         printf("===========================================\n");
         printf("\nGenerated files:\n");
-        printf("  - %s (GeoTIFF source file)\n", OUTPUT_FILENAME);
+        if (create_demo) {
+            printf("  - %s (GeoTIFF source file)\n", OUTPUT_FILENAME);
+        }
         printf("  - %s (RGB data for gnuplot)\n", GNUPLOT_RGB_DATA);
         printf("  - %s (Grayscale data for gnuplot)\n", GNUPLOT_GRAY_DATA);
         printf("  - %s (gnuplot script)\n", GNUPLOT_SCRIPT);

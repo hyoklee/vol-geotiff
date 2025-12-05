@@ -47,34 +47,52 @@ typedef struct geotiff_file_t {
      * have its own TIFF handle via TIFFOpen(). Currently using shared handle. */
 } geotiff_file_t;
 
+/* Forward declaration for unified object type */
+typedef struct geotiff_object_t geotiff_object_t;
+
 /* GeoTIFF VOL dataset object structure */
 typedef struct geotiff_dataset_t {
-    geotiff_file_t *file; /* Parent file */
-    char *name;           /* Dataset name */
-    int directory_index;  /* TIFF directory index for multi-image files */
-    GTIF *gtif;           /* GeoTIFF handle for this directory's geo keys */
-    hid_t type_id;        /* HDF5 datatype */
-    hid_t space_id;       /* HDF5 dataspace */
-    void *data;           /* Cached data */
-    size_t data_size;     /* Data size in bytes */
-    bool is_image;        /* Is this an image dataset */
+    char *name;          /* Dataset name */
+    int directory_index; /* TIFF directory index for multi-image files */
+    GTIF *gtif;          /* GeoTIFF handle for this directory's geo keys */
+    hid_t type_id;       /* HDF5 datatype */
+    hid_t space_id;      /* HDF5 dataspace */
+    void *data;          /* Cached data */
+    size_t data_size;    /* Data size in bytes */
+    bool is_image;       /* Is this an image dataset */
 } geotiff_dataset_t;
 
 /* GeoTIFF VOL group object structure */
 typedef struct geotiff_group_t {
-    geotiff_file_t *file; /* Parent file */
-    char *name;           /* Group name */
+    char *name; /* Group name */
 } geotiff_group_t;
 
 /* GeoTIFF VOL attribute object structure */
 typedef struct geotiff_attr_t {
-    geotiff_file_t *file; /* Parent file */
-    char *name;           /* Attribute name */
-    hid_t type_id;        /* HDF5 datatype */
-    hid_t space_id;       /* HDF5 dataspace */
-    void *data;           /* Attribute data */
-    size_t data_size;     /* Data size in bytes */
+    void *parent;            /* Parent object (dataset, group, or file) */
+    char *name;              /* Attribute name */
+    hid_t type_id;           /* HDF5 datatype */
+    hid_t space_id;          /* HDF5 dataspace */
+    bool is_coordinate_attr; /* True if this is the computed 'coordinates' attribute */
 } geotiff_attr_t;
+
+/* Unified GeoTIFF VOL object structure */
+struct geotiff_object_t {
+    geotiff_object_t *parent_file; /* Parent file (never NULL after open) */
+    H5I_type_t obj_type;           /* HDF5 object type identifier */
+    size_t ref_count;              /* Reference count for child objects */
+    union {
+        geotiff_file_t file;
+        geotiff_dataset_t dataset;
+        geotiff_group_t group;
+        geotiff_attr_t attr;
+    } u;
+};
+
+typedef struct {
+    double lon;
+    double lat;
+} coord_t;
 
 /* Function prototypes (HDF5 develop expects hid_t vipl_id) */
 herr_t geotiff_init_connector(hid_t vipl_id);
@@ -113,9 +131,11 @@ herr_t geotiff_link_specific(void *obj, const H5VL_loc_params_t *loc_params,
                              H5VL_link_specific_args_t *args, hid_t dxpl_id, void **req);
 
 /* Helper functions */
-herr_t geotiff_read_hyperslab(const geotiff_dataset_t *dset, const hsize_t *start,
+herr_t geotiff_read_hyperslab(const geotiff_object_t *dset_obj, const hsize_t *start,
                               const hsize_t *stride, const hsize_t *count, const hsize_t *block,
                               int ndims, hid_t mem_type_id, void *buf);
+hid_t geotiff_create_coordinate_type(void);
+herr_t geotiff_compute_coordinates(const geotiff_dataset_t *dset, void *buf, hid_t mem_space_id);
 
 herr_t geotiff_introspect_opt_query(void *obj, H5VL_subclass_t subcls, int opt_type,
                                     uint64_t *flags);

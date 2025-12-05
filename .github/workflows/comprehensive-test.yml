@@ -155,7 +155,7 @@ jobs:
         for tiff_file in ../test/test_*.tif; do
           if [ -f "$tiff_file" ]; then
             echo "Testing with $tiff_file"
-            ./test/test_geotiff_read "$tiff_file" || echo "Test failed for $tiff_file"
+            ./test/test_runner real_file_test "$tiff_file" || echo "Test failed for $tiff_file"
           fi
         done
 
@@ -167,11 +167,11 @@ jobs:
         export LD_LIBRARY_PATH=${{ github.workspace }}/hdf5-${{ matrix.hdf5_version }}/lib:$LD_LIBRARY_PATH
 
         # Run valgrind on basic test
-        valgrind --leak-check=full --error-exitcode=1 ./test/vol_plugin
+        valgrind --leak-check=full --error-exitcode=1 ./test/test_runner test_getters
 
         # Test one GeoTIFF file with valgrind
         if [ -f ../test/test_uint8.tif ]; then
-          valgrind --leak-check=full --error-exitcode=1 ./test/test_geotiff_read ../test/test_uint8.tif
+          valgrind --leak-check=full --error-exitcode=1 ./test/test_runner real_file_test ../test/test_uint8.tif
         fi
 
     - name: Performance test
@@ -187,7 +187,7 @@ jobs:
         # Simple performance timing
         if [ -f ../test/test_uint16.tif ]; then
           echo "Performance test:"
-          time ./test/test_geotiff_read ../test/test_uint16.tif
+          time ./test/test_runner real_file_test ../test/test_uint16.tif
         fi
 
     - name: Upload test artifacts on failure
