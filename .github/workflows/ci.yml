@@ -105,7 +105,7 @@ jobs:
           export HDF5_PLUGIN_PATH=$PWD/src
           export LD_LIBRARY_PATH=${{ github.workspace }}/hdf5-${{ matrix.hdf5-version }}/lib:$LD_LIBRARY_PATH
           if [ -f ../test/sample.tif ]; then
-            ./test/test_geotiff_read ../test/sample.tif
+            ./test/test_runner real_file_test ../test/sample.tif
           else
             echo "No sample.tif found, skipping GeoTIFF read test"
           fi
