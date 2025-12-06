@@ -1,6 +1,6 @@
 # Build the GeoTIFF test (now includes test file generation)
 add_executable (test_runner test_runner.c plugin_tests.c geotiff_tests.c)
-target_include_directories (test_runner PRIVATE "${PROJECT_SOURCE_DIR}/src" ${HDF5_INCLUDE_DIRS} ${GEOTIFF_INCLUDE_DIRS})
+target_include_directories (test_runner PRIVATE "${PROJECT_SOURCE_DIR}/src" ${HDF5_INCLUDE_DIRS})
 
 # Define the plugin path for the tests to use
 target_compile_definitions(test_runner PRIVATE
@@ -11,6 +11,8 @@ if (_have_config)
     target_link_libraries (test_runner PRIVATE HDF5::HDF5 TIFF::TIFF ${_GEOTIFF_TARGET})
 else()
     target_link_libraries (test_runner PRIVATE HDF5::HDF5 ${TIFF_LIBRARIES} ${GEOTIFF_LIBRARIES})
+    target_include_directories (test_runner PRIVATE ${TIFF_INCLUDE_DIRS} ${GEOTIFF_INCLUDE_DIRS})
+    target_compile_options(test_runner PRIVATE ${TIFF_CFLAGS_OTHER} ${GEOTIFF_CFLAGS_OTHER})
 endif()
 
 # Add the GeoTIFF test (if a sample GeoTIFF file exists)
