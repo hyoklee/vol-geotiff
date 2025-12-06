@@ -108,10 +108,18 @@ jobs:
           export CXX=clang++
         fi
 
+        # Set CMAKE_PREFIX_PATH to include Homebrew on macOS
+        if [ "${{ runner.os }}" = "macOS" ]; then
+          BREW_PREFIX=$(brew --prefix)
+          CMAKE_PREFIX_PATH="${{ github.workspace }}/hdf5-${{ matrix.hdf5_version }};${BREW_PREFIX}"
+        else
+          CMAKE_PREFIX_PATH="${{ github.workspace }}/hdf5-${{ matrix.hdf5_version }}"
+        fi
+
         cmake .. \
           -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
           -DHDF5_DIR=${{ github.workspace }}/hdf5-${{ matrix.hdf5_version }}/share/cmake \
-          -DCMAKE_PREFIX_PATH=${{ github.workspace }}/hdf5-${{ matrix.hdf5_version }} \
+          -DCMAKE_PREFIX_PATH="${CMAKE_PREFIX_PATH}" \
           -DCMAKE_C_FLAGS="-Wall -Wextra"
 
         if [ "${{ runner.os }}" = "macOS" ]; then

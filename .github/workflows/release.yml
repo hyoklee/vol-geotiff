@@ -151,9 +151,11 @@ jobs:
     - name: Build GeoTIFF VOL Connector
       run: |
         mkdir build && cd build
+        BREW_PREFIX=$(brew --prefix)
         cmake .. \
           -DCMAKE_BUILD_TYPE=Release \
           -DHDF5_DIR=${{ github.workspace }}/hdf5-install/share/cmake \
+          -DCMAKE_PREFIX_PATH="${{ github.workspace }}/hdf5-install;${BREW_PREFIX}" \
           -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/geotiff-vol-install
         make -j$(sysctl -n hw.ncpu)
         make install
