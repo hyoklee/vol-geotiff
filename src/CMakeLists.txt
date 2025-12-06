@@ -68,12 +68,17 @@ if (NOT _have_config)
     find_library(GEOTIFF_LIBRARY NAMES geotiff
                  HINTS ${_VCPKG_LIB_HINT})
 
-    if(NOT GEOTIFF_INCLUDE_DIR OR NOT GEOTIFF_LIBRARY)
-        message(FATAL_ERROR "libgeotiff not found. Ensure GeoTIFF is installed (e.g., via vcpkg) or provide headers/libs.")
+    if(GEOTIFF_INCLUDE_DIR AND GEOTIFF_LIBRARY)
+        set(GEOTIFF_LIBRARIES ${GEOTIFF_LIBRARY})
+        set(GEOTIFF_INCLUDE_DIRS ${GEOTIFF_INCLUDE_DIR})
+    else()
+        # Last resort: pkg-config
+        find_package(PkgConfig REQUIRED)
+        pkg_check_modules(GEOTIFF REQUIRED libgeotiff)
+        if(NOT GEOTIFF_FOUND)
+            message(FATAL_ERROR "libgeotiff not found. Ensure GeoTIFF is installed (e.g., via vcpkg or brew) or provide headers/libs.")
+        endif()
     endif()
-
-    set(GEOTIFF_LIBRARIES ${GEOTIFF_LIBRARY})
-    set(GEOTIFF_INCLUDE_DIRS ${GEOTIFF_INCLUDE_DIR})
     # Propagate to parent scope so tests can include headers
     set(GEOTIFF_INCLUDE_DIRS "${GEOTIFF_INCLUDE_DIRS}" PARENT_SCOPE)
     set(GEOTIFF_LIBRARIES "${GEOTIFF_LIBRARIES}" PARENT_SCOPE)
