@@ -22,14 +22,18 @@ endif()
 
 if (TARGET TIFF::TIFF AND _GEOTIFF_TARGET)
     set(_have_config TRUE)
+    message(STATUS "Using CONFIG mode: _have_config = TRUE")
     # Extract include directories from the imported GeoTIFF target for use by tests
     get_target_property(GEOTIFF_INCLUDE_DIRS ${_GEOTIFF_TARGET} INTERFACE_INCLUDE_DIRECTORIES)
     # Propagate to parent scope so tests can include headers
     set(GEOTIFF_INCLUDE_DIRS "${GEOTIFF_INCLUDE_DIRS}" PARENT_SCOPE)
+else()
+    message(STATUS "Using pkg-config/manual mode: _have_config = FALSE")
 endif()
 
 if (NOT _have_config)
     message(STATUS "Falling back to alternate discovery for TIFF/geotiff (vcpkg HINTS, pkg-config last)")
+    message(STATUS "DEBUG: _have_config = ${_have_config}")
     # Try to find TIFF without pkg-config to support Windows easily
     if (NOT TARGET TIFF::TIFF)
         set(_TIFF_INC_HINT "")
@@ -45,10 +49,14 @@ if (NOT _have_config)
         if (TIFF_INCLUDE_DIR AND TIFF_LIBRARY)
             set(TIFF_INCLUDE_DIRS ${TIFF_INCLUDE_DIR})
             set(TIFF_LIBRARIES ${TIFF_LIBRARY})
+            message(STATUS "Found TIFF via find_path/find_library")
+            message(STATUS "TIFF_INCLUDE_DIRS: ${TIFF_INCLUDE_DIRS}")
         else()
             # Last resort: pkg-config
+            message(STATUS "Trying pkg-config for TIFF...")
             find_package(PkgConfig REQUIRED)
             pkg_check_modules(TIFF REQUIRED libtiff-4)
+            message(STATUS "pkg-config TIFF_INCLUDE_DIRS: ${TIFF_INCLUDE_DIRS}")
         endif()
     endif()
 
@@ -107,9 +115,14 @@ set_target_properties (${GEOTIFF_VOL_NAME} PROPERTIES PUBLIC_HEADER "geotiff_vol
 target_include_directories(${GEOTIFF_VOL_NAME} PRIVATE ${HDF5_INCLUDE_DIRS})
 
 # Link libraries
+message(STATUS "Building ${GEOTIFF_VOL_NAME} with _have_config = ${_have_config}")
 if (_have_config)
+    message(STATUS "Using CONFIG targets: TIFF::TIFF and ${_GEOTIFF_TARGET}")
     target_link_libraries(${GEOTIFF_VOL_NAME} PRIVATE TIFF::TIFF ${_GEOTIFF_TARGET} HDF5::HDF5)
 else()
+    message(STATUS "Using manual libraries: ${TIFF_LIBRARIES} ${GEOTIFF_LIBRARIES}")
+    message(STATUS "Adding include dirs: TIFF=${TIFF_INCLUDE_DIRS}")
+    message(STATUS "Adding include dirs: GEOTIFF=${GEOTIFF_INCLUDE_DIRS}")
     target_link_libraries(${GEOTIFF_VOL_NAME} PRIVATE ${TIFF_LIBRARIES} ${GEOTIFF_LIBRARIES} HDF5::HDF5)
     target_include_directories(${GEOTIFF_VOL_NAME} PRIVATE ${TIFF_INCLUDE_DIRS} ${GEOTIFF_INCLUDE_DIRS})
     target_compile_options(${GEOTIFF_VOL_NAME} PRIVATE ${TIFF_CFLAGS_OTHER} ${GEOTIFF_CFLAGS_OTHER})
