@@ -94,27 +94,10 @@ jobs:
         fi
         make install
 
-    - name: Create comprehensive test GeoTIFFs
+    - name: Verify test GeoTIFF files exist
       run: |
-        cd test
-        # Create simple test TIFF files for different data types
-        # test_uint8.tif
-        dd if=/dev/zero of=test_uint8.tif bs=1024 count=5 2>/dev/null
-        printf 'II*\0\x08\0\0\0' | dd of=test_uint8.tif conv=notrunc 2>/dev/null
-
-        # test_uint16.tif
-        dd if=/dev/zero of=test_uint16.tif bs=1024 count=3 2>/dev/null
-        printf 'II*\0\x08\0\0\0' | dd of=test_uint16.tif conv=notrunc 2>/dev/null
-
-        # test_float32.tif
-        dd if=/dev/zero of=test_float32.tif bs=1024 count=2 2>/dev/null
-        printf 'II*\0\x08\0\0\0' | dd of=test_float32.tif conv=notrunc 2>/dev/null
-
-        # test_rgb.tif
-        dd if=/dev/zero of=test_rgb.tif bs=1024 count=4 2>/dev/null
-        printf 'II*\0\x08\0\0\0' | dd of=test_rgb.tif conv=notrunc 2>/dev/null
-
-        echo "Created test TIFF files"
+        echo "Using existing valid GeoTIFF test files from repository:"
+        ls -lh test/*.tif | head -10
 
     - name: Configure and build
       run: |
@@ -151,8 +134,8 @@ jobs:
         # Run basic tests
         make test
 
-        # Test with different GeoTIFF files
-        for tiff_file in ../test/test_*.tif; do
+        # Test with a few different GeoTIFF files to verify comprehensive support
+        for tiff_file in ../test/byte.tif ../test/uint16.tif ../test/int32.tif; do
           if [ -f "$tiff_file" ]; then
             echo "Testing with $tiff_file"
             ./test/test_runner real_file_test "$tiff_file" || echo "Test failed for $tiff_file"
@@ -170,8 +153,8 @@ jobs:
         valgrind --leak-check=full --error-exitcode=1 ./test/test_runner test_getters
 
         # Test one GeoTIFF file with valgrind
-        if [ -f ../test/test_uint8.tif ]; then
-          valgrind --leak-check=full --error-exitcode=1 ./test/test_runner real_file_test ../test/test_uint8.tif
+        if [ -f ../test/byte.tif ]; then
+          valgrind --leak-check=full --error-exitcode=1 ./test/test_runner real_file_test ../test/byte.tif
         fi
 
     - name: Performance test
@@ -185,9 +168,9 @@ jobs:
         fi
 
         # Simple performance timing
-        if [ -f ../test/test_uint16.tif ]; then
+        if [ -f ../test/uint16.tif ]; then
           echo "Performance test:"
-          time ./test/test_runner real_file_test ../test/test_uint16.tif
+          time ./test/test_runner real_file_test ../test/uint16.tif
         fi
 
     - name: Upload test artifacts on failure
