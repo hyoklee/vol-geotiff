@@ -7,9 +7,14 @@ target_compile_definitions(test_runner PRIVATE
     GEOTIFF_VOL_PLUGIN_PATH="${PROJECT_BINARY_DIR}/src")
 
 # Link test_runner with required libraries
+message(STATUS "TEST: Building test_runner with _have_config = ${_have_config}")
+message(STATUS "TEST: TIFF_INCLUDE_DIRS = ${TIFF_INCLUDE_DIRS}")
+message(STATUS "TEST: GEOTIFF_INCLUDE_DIRS = ${GEOTIFF_INCLUDE_DIRS}")
 if (_have_config)
+    message(STATUS "TEST: Using CONFIG targets")
     target_link_libraries (test_runner PRIVATE HDF5::HDF5 TIFF::TIFF ${_GEOTIFF_TARGET})
 else()
+    message(STATUS "TEST: Using manual libraries, adding include dirs")
     target_link_libraries (test_runner PRIVATE HDF5::HDF5 ${TIFF_LIBRARIES} ${GEOTIFF_LIBRARIES})
     target_include_directories (test_runner PRIVATE ${TIFF_INCLUDE_DIRS} ${GEOTIFF_INCLUDE_DIRS})
     target_compile_options(test_runner PRIVATE ${TIFF_CFLAGS_OTHER} ${GEOTIFF_CFLAGS_OTHER})
