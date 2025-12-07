@@ -89,6 +89,27 @@ if (NOT _have_config)
         message(STATUS "pkg-config GEOTIFF_INCLUDE_DIRS: ${GEOTIFF_INCLUDE_DIRS}")
         message(STATUS "pkg-config GEOTIFF_LIBRARIES: ${GEOTIFF_LIBRARIES}")
         message(STATUS "pkg-config GEOTIFF_LIBRARY_DIRS: ${GEOTIFF_LIBRARY_DIRS}")
+
+        # Check if headers are in a geotiff subdirectory or not
+        # On macOS Homebrew, headers are at /opt/homebrew/include/geotiffio.h
+        # On Linux, headers are at /usr/include/geotiff/geotiffio.h
+        # We need to create a compatibility shim for macOS
+        list(GET GEOTIFF_INCLUDE_DIRS 0 GEOTIFF_FIRST_INCLUDE)
+        if(NOT EXISTS "${GEOTIFF_FIRST_INCLUDE}/geotiff/geotiffio.h")
+            message(STATUS "Headers not in geotiff/ subdirectory, creating compatibility shim")
+            file(MAKE_DIRECTORY "${PROJECT_BINARY_DIR}/geotiff_compat/geotiff")
+            file(CREATE_LINK "${GEOTIFF_FIRST_INCLUDE}/geotiffio.h"
+                 "${PROJECT_BINARY_DIR}/geotiff_compat/geotiff/geotiffio.h" SYMBOLIC)
+            file(CREATE_LINK "${GEOTIFF_FIRST_INCLUDE}/geo_normalize.h"
+                 "${PROJECT_BINARY_DIR}/geotiff_compat/geotiff/geo_normalize.h" SYMBOLIC)
+            file(CREATE_LINK "${GEOTIFF_FIRST_INCLUDE}/geotiff.h"
+                 "${PROJECT_BINARY_DIR}/geotiff_compat/geotiff/geotiff.h" SYMBOLIC)
+            file(CREATE_LINK "${GEOTIFF_FIRST_INCLUDE}/xtiffio.h"
+                 "${PROJECT_BINARY_DIR}/geotiff_compat/geotiff/xtiffio.h" SYMBOLIC)
+            # Prepend the compat directory to include paths
+            set(GEOTIFF_INCLUDE_DIRS "${PROJECT_BINARY_DIR}/geotiff_compat;${GEOTIFF_INCLUDE_DIRS}")
+            message(STATUS "Created geotiff compatibility shim at ${PROJECT_BINARY_DIR}/geotiff_compat")
+        endif()
     endif()
     # Propagate to parent scope so tests can include headers
     set(GEOTIFF_INCLUDE_DIRS "${GEOTIFF_INCLUDE_DIRS}" PARENT_SCOPE)
