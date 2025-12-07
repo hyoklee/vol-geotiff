@@ -98,17 +98,37 @@ if (NOT _have_config)
         if(NOT EXISTS "${GEOTIFF_FIRST_INCLUDE}/geotiff/geotiffio.h")
             message(STATUS "Headers not in geotiff/ subdirectory, creating compatibility shim")
             file(MAKE_DIRECTORY "${PROJECT_BINARY_DIR}/geotiff_compat/geotiff")
-            file(CREATE_LINK "${GEOTIFF_FIRST_INCLUDE}/geotiffio.h"
-                 "${PROJECT_BINARY_DIR}/geotiff_compat/geotiff/geotiffio.h" SYMBOLIC)
-            file(CREATE_LINK "${GEOTIFF_FIRST_INCLUDE}/geo_normalize.h"
-                 "${PROJECT_BINARY_DIR}/geotiff_compat/geotiff/geo_normalize.h" SYMBOLIC)
-            file(CREATE_LINK "${GEOTIFF_FIRST_INCLUDE}/geotiff.h"
-                 "${PROJECT_BINARY_DIR}/geotiff_compat/geotiff/geotiff.h" SYMBOLIC)
-            file(CREATE_LINK "${GEOTIFF_FIRST_INCLUDE}/xtiffio.h"
-                 "${PROJECT_BINARY_DIR}/geotiff_compat/geotiff/xtiffio.h" SYMBOLIC)
+
+            # Symlink all geotiff headers
+            set(GEOTIFF_HEADERS
+                geotiffio.h geo_normalize.h geotiff.h xtiffio.h geovalues.h
+                geokeys.h geonames.h geo_tiffp.h cpl_serv.h geo_config.h
+                geo_simpletags.h geo_keyp.h)
+
+            foreach(HEADER ${GEOTIFF_HEADERS})
+                if(EXISTS "${GEOTIFF_FIRST_INCLUDE}/${HEADER}")
+                    file(CREATE_LINK "${GEOTIFF_FIRST_INCLUDE}/${HEADER}"
+                         "${PROJECT_BINARY_DIR}/geotiff_compat/geotiff/${HEADER}" SYMBOLIC)
+                endif()
+            endforeach()
+
             # Prepend the compat directory to include paths
             set(GEOTIFF_INCLUDE_DIRS "${PROJECT_BINARY_DIR}/geotiff_compat;${GEOTIFF_INCLUDE_DIRS}")
             message(STATUS "Created geotiff compatibility shim at ${PROJECT_BINARY_DIR}/geotiff_compat")
+        endif()
+
+        # Fix library paths - pkg-config returns just library names, need full paths
+        if(GEOTIFF_LIBRARY_DIRS)
+            set(GEOTIFF_LIBRARIES "")
+            foreach(LIB ${GEOTIFF_LIBRARIES})
+                find_library(GEOTIFF_LIB_${LIB} NAMES ${LIB} PATHS ${GEOTIFF_LIBRARY_DIRS} NO_DEFAULT_PATH)
+                if(GEOTIFF_LIB_${LIB})
+                    list(APPEND GEOTIFF_LIBRARIES ${GEOTIFF_LIB_${LIB}})
+                else()
+                    list(APPEND GEOTIFF_LIBRARIES ${LIB})
+                endif()
+            endforeach()
+            message(STATUS "Resolved GEOTIFF_LIBRARIES: ${GEOTIFF_LIBRARIES}")
         endif()
     endif()
     # Propagate to parent scope so tests can include headers
