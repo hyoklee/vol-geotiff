@@ -103,6 +103,16 @@ jobs:
         echo "Using existing valid GeoTIFF test files from repository:"
         ls -lh test/*.tif | head -10
 
+    - name: Check libgeotiff header locations
+      run: |
+        echo "=== Checking where geotiff headers are installed ==="
+        find /opt/homebrew -name "geotiffio.h" 2>/dev/null || true
+        find /opt/homebrew -name "geo_normalize.h" 2>/dev/null || true
+        echo "=== Listing /opt/homebrew/include ==="
+        ls -la /opt/homebrew/include/ | grep -i geotiff || true
+        echo "=== Checking for geotiff subdirectory ==="
+        ls -la /opt/homebrew/include/geotiff/ 2>/dev/null || echo "No geotiff subdirectory"
+
     - name: Configure and build
       run: |
         mkdir build && cd build
