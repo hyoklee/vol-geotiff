@@ -83,8 +83,29 @@ jobs:
         & "$env:VCPKG_ROOT\vcpkg.exe" install libgeotiff:x64-windows
 
         # Debug: Check what was installed
-        Write-Host "Checking installed files..."
+        Write-Host "`nChecking installed files..."
         Get-ChildItem "$env:VCPKG_ROOT\installed\x64-windows\include" -Recurse -Filter "*geotiff*"
+
+        # Check if headers are in geotiff subdirectory
+        $includeDir = "$env:VCPKG_ROOT\installed\x64-windows\include"
+        if (-Not (Test-Path "$includeDir\geotiff\geotiffio.h")) {
+            Write-Host "`nHeaders not in geotiff/ subdirectory, creating compatibility layer"
+            New-Item -ItemType Directory -Force -Path "$includeDir\geotiff"
+
+            # Copy all geotiff headers to subdirectory
+            $headers = @("geotiffio.h", "geo_normalize.h", "geotiff.h", "xtiffio.h", "geovalues.h",
+                         "geokeys.h", "geonames.h", "geo_tiffp.h", "cpl_serv.h", "geo_config.h",
+                         "geo_simpletags.h", "geo_keyp.h")
+
+            foreach ($header in $headers) {
+                if (Test-Path "$includeDir\$header") {
+                    Copy-Item "$includeDir\$header" "$includeDir\geotiff\$header"
+                    Write-Host "Copied $header to geotiff/"
+                }
+            }
+        } else {
+            Write-Host "`nHeaders already in geotiff/ subdirectory"
+        }
 
         # Set CMAKE_PREFIX_PATH for later steps
         echo "CMAKE_PREFIX_PATH=$env:VCPKG_ROOT\installed\x64-windows" >> $env:GITHUB_ENV
