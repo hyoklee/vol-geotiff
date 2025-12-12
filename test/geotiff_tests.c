@@ -25,7 +25,14 @@
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
+#ifndef _WIN32
 #include <unistd.h>
+#else
+#include <io.h>
+#define access _access
+#define F_OK 0
+#define unlink _unlink
+#endif
 
 /* Helper function to set up GeoTIFF keys */
 static void SetUpGeoKeys(GTIF *gtif)

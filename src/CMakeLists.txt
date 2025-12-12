@@ -41,10 +41,19 @@ if (NOT _have_config)
         if (DEFINED VCPKG_ROOT AND DEFINED VCPKG_TARGET_TRIPLET)
             set(_TIFF_INC_HINT "${VCPKG_ROOT}/installed/${VCPKG_TARGET_TRIPLET}/include")
             set(_TIFF_LIB_HINT "${VCPKG_ROOT}/installed/${VCPKG_TARGET_TRIPLET}/lib")
+        else()
+            # Try to extract from CMAKE_PREFIX_PATH
+            foreach(_prefix ${CMAKE_PREFIX_PATH})
+                if(EXISTS "${_prefix}/include" AND EXISTS "${_prefix}/lib")
+                    set(_TIFF_INC_HINT "${_prefix}/include")
+                    set(_TIFF_LIB_HINT "${_prefix}/lib")
+                    break()
+                endif()
+            endforeach()
         endif()
         find_path(TIFF_INCLUDE_DIR tiffio.h
                   HINTS ${_TIFF_INC_HINT})
-        find_library(TIFF_LIBRARY NAMES tiff
+        find_library(TIFF_LIBRARY NAMES tiff tiffd
                      HINTS ${_TIFF_LIB_HINT})
         if (TIFF_INCLUDE_DIR AND TIFF_LIBRARY)
             set(TIFF_INCLUDE_DIRS ${TIFF_INCLUDE_DIR})
@@ -66,6 +75,15 @@ if (NOT _have_config)
     if (DEFINED VCPKG_ROOT AND DEFINED VCPKG_TARGET_TRIPLET)
         set(_VCPKG_INC_HINT "${VCPKG_ROOT}/installed/${VCPKG_TARGET_TRIPLET}/include")
         set(_VCPKG_LIB_HINT "${VCPKG_ROOT}/installed/${VCPKG_TARGET_TRIPLET}/lib")
+    else()
+        # Try to extract from CMAKE_PREFIX_PATH
+        foreach(_prefix ${CMAKE_PREFIX_PATH})
+            if(EXISTS "${_prefix}/include" AND EXISTS "${_prefix}/lib")
+                set(_VCPKG_INC_HINT "${_prefix}/include")
+                set(_VCPKG_LIB_HINT "${_prefix}/lib")
+                break()
+            endif()
+        endforeach()
     endif()
     if (EXISTS "${_VCPKG_INC_HINT}/geotiff/geotiff.h")
         set(GEOTIFF_INCLUDE_DIR "${_VCPKG_INC_HINT}")
@@ -73,13 +91,24 @@ if (NOT _have_config)
 
     find_path(GEOTIFF_INCLUDE_DIR geotiff/geotiff.h
               HINTS ${_VCPKG_INC_HINT})
-    find_library(GEOTIFF_LIBRARY NAMES geotiff
-                 HINTS ${_VCPKG_LIB_HINT})
+    message(STATUS "Looking for GeoTIFF library in ${_VCPKG_LIB_HINT}")
+
+    # Check for geotiff_i.lib directly (vcpkg naming)
+    if(EXISTS "${_VCPKG_LIB_HINT}/geotiff_i.lib")
+        set(GEOTIFF_LIBRARY "${_VCPKG_LIB_HINT}/geotiff_i.lib")
+        message(STATUS "Found geotiff_i.lib directly at ${GEOTIFF_LIBRARY}")
+    else()
+        find_library(GEOTIFF_LIBRARY NAMES geotiff_i geotiff
+                     HINTS ${_VCPKG_LIB_HINT})
+        message(STATUS "find_library result: GEOTIFF_LIBRARY = '${GEOTIFF_LIBRARY}'")
+    endif()
+    message(STATUS "GEOTIFF_INCLUDE_DIR = '${GEOTIFF_INCLUDE_DIR}'")
 
     if(GEOTIFF_INCLUDE_DIR AND GEOTIFF_LIBRARY)
         set(GEOTIFF_LIBRARIES ${GEOTIFF_LIBRARY})
         set(GEOTIFF_INCLUDE_DIRS ${GEOTIFF_INCLUDE_DIR})
         message(STATUS "Found GeoTIFF via find_path/find_library")
+        message(STATUS "GEOTIFF_LIBRARY = ${GEOTIFF_LIBRARY}")
     else()
         # Last resort: pkg-config
         message(STATUS "Trying pkg-config for libgeotiff...")

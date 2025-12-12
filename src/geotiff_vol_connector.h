@@ -17,6 +17,13 @@
 #ifndef _geotiff_vol_connector_H
 #define _geotiff_vol_connector_H
 
+/* MSVC doesn't support __attribute__, define it as empty */
+#ifdef _MSC_VER
+#ifndef __attribute__
+#define __attribute__(x)
+#endif
+#endif
+
 /* Try to include geotiff headers in standard locations */
 // cppcheck-suppress preprocessorErrorDirective
 #if defined(__has_include) && __has_include(<geotiff/geotiff.h>)

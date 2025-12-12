@@ -25,13 +25,13 @@ if(EXISTS "${PROJECT_SOURCE_DIR}/test/sample.tif")
     add_test(NAME test_runner_read
              COMMAND ${CMAKE_COMMAND} -E env
                      "HDF5_PLUGIN_PATH=${PROJECT_BINARY_DIR}/src/Release\;${PROJECT_BINARY_DIR}/src"
-                     "PATH=C:/src/hdf5-dev/install/bin\;C:/src/vcpkg.microsoft/installed/x64-windows/bin\;$ENV{PATH}"
+                     "PATH=C:/src/hdf5.HDFGroup/n/bin/Release\;C:/vcpkg.ms/installed/x64-windows/bin\;$ENV{PATH}"
                      "HDF5_VOL_CONNECTOR="
                      $<TARGET_FILE:test_runner> real_file_test "${PROJECT_SOURCE_DIR}/test/sample.tif")
 endif()
 
 # Add individual test cases
-set(TEST_ENVIRONMENT "HDF5_PLUGIN_PATH=${PROJECT_BINARY_DIR}/src/Release\;${PROJECT_BINARY_DIR}/src;PATH=C:/src/hdf5-dev/install/bin\;C:/src/vcpkg.microsoft/installed/x64-windows/bin\;$ENV{PATH};HDF5_VOL_CONNECTOR=")
+set(TEST_ENVIRONMENT "HDF5_PLUGIN_PATH=${PROJECT_BINARY_DIR}/src/Release\;${PROJECT_BINARY_DIR}/src;PATH=C:/src/hdf5.HDFGroup/n/bin/Release\;C:/vcpkg.ms/installed/x64-windows/bin\;$ENV{PATH};HDF5_VOL_CONNECTOR=")
 
 # Plugin registration tests
 add_test(NAME test_getters COMMAND test_runner test_getters)
@@ -176,7 +176,7 @@ foreach(TEST_FILE ${GDAL_TEST_FILES})
         add_test(NAME ${TEST_NAME}
                  COMMAND ${CMAKE_COMMAND} -E env
                          "HDF5_PLUGIN_PATH=${PROJECT_BINARY_DIR}/src/Release\;${PROJECT_BINARY_DIR}/src"
-                         "PATH=C:/src/hdf5-dev/install/bin\;C:/src/vcpkg.microsoft/installed/x64-windows/bin\;$ENV{PATH}"
+                         "PATH=C:/src/hdf5.HDFGroup/n/bin/Release\;C:/vcpkg.ms/installed/x64-windows/bin\;$ENV{PATH}"
                          "HDF5_VOL_CONNECTOR="
                          $<TARGET_FILE:test_runner> real_file_test "${PROJECT_SOURCE_DIR}/test/${TEST_FILE}")
     endif()

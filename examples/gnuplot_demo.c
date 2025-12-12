@@ -16,7 +16,23 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#ifndef _WIN32
 #include <unistd.h>
+#else
+#include <direct.h>
+#include <io.h>
+#define getcwd _getcwd
+#define setenv(name,value,overwrite) _putenv_s(name,value)
+#define chmod(path,mode) _chmod(path,mode)
+#define S_ISDIR(m) (((m) & _S_IFMT) == _S_IFDIR)
+#ifndef PATH_MAX
+#define PATH_MAX 260
+#endif
+#endif
+
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
 
 #include <geotiff/geotiffio.h>
 #include <geotiff/xtiffio.h>
