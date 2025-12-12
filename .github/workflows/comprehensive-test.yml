@@ -277,9 +277,44 @@ jobs:
       if: runner.os == 'Windows'
       run: |
         cd build
+
+        # Copy DLLs to test directory for reliable access
+        Write-Host "Copying required DLLs to test directory..."
+        $testDir = ".\test\${{ matrix.build_type }}"
+        $hdf5BinDir = "${{ github.workspace }}\hdf5-${{ matrix.hdf5_version }}\bin\${{ matrix.build_type }}"
+        $vcpkgBinDir = "$env:VCPKG_INSTALLATION_ROOT\installed\x64-windows\bin"
+        $volBinDir = ".\src\${{ matrix.build_type }}"
+
+        # Copy HDF5 DLLs
+        if (Test-Path $hdf5BinDir) {
+          Copy-Item "$hdf5BinDir\*.dll" $testDir -ErrorAction SilentlyContinue
+          Write-Host "Copied HDF5 DLLs from $hdf5BinDir"
+        }
+
+        # Copy vcpkg DLLs (tiff, geotiff, zlib, zstd, etc.)
+        if (Test-Path $vcpkgBinDir) {
+          Copy-Item "$vcpkgBinDir\*.dll" $testDir -ErrorAction SilentlyContinue
+          Write-Host "Copied vcpkg DLLs from $vcpkgBinDir"
+        }
+
+        # Copy VOL connector DLL
+        if (Test-Path $volBinDir) {
+          Copy-Item "$volBinDir\*.dll" $testDir -ErrorAction SilentlyContinue
+          Write-Host "Copied VOL connector DLL from $volBinDir"
+        }
+
+        # List DLLs in test directory
+        Write-Host "`nDLLs in test directory:"
+        Get-ChildItem $testDir -Filter "*.dll" | Format-Table Name
+
+        # Set environment variables
         $env:HDF5_PLUGIN_PATH = "$PWD\src\${{ matrix.build_type }};$PWD\src"
-        $env:PATH = "${{ github.workspace }}\hdf5-${{ matrix.hdf5_version }}\bin\${{ matrix.build_type }};$env:VCPKG_INSTALLATION_ROOT\installed\x64-windows\bin;$env:PATH"
+        $env:PATH = "$hdf5BinDir;$vcpkgBinDir;$env:PATH"
         $env:HDF5_VOL_CONNECTOR = ""
+
+        Write-Host "`nEnvironment variables:"
+        Write-Host "HDF5_PLUGIN_PATH: $env:HDF5_PLUGIN_PATH"
+        Write-Host "PATH (first 3 entries): $(($env:PATH -split ';')[0..2] -join ';')"
 
         # Run basic tests
         ctest -C ${{ matrix.build_type }} --output-on-failure
@@ -333,8 +368,9 @@ jobs:
       if: runner.os == 'Windows'
       run: |
         cd build
+
+        # Set environment variables (DLLs already copied in test step)
         $env:HDF5_PLUGIN_PATH = "$PWD\src\${{ matrix.build_type }};$PWD\src"
-        $env:PATH = "${{ github.workspace }}\hdf5-${{ matrix.hdf5_version }}\bin\${{ matrix.build_type }};$env:VCPKG_INSTALLATION_ROOT\installed\x64-windows\bin;$env:PATH"
         $env:HDF5_VOL_CONNECTOR = ""
 
         # Simple performance timing
