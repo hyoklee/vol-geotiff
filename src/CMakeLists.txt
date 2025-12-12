@@ -25,8 +25,14 @@ if (TARGET TIFF::TIFF AND _GEOTIFF_TARGET)
     message(STATUS "Using CONFIG mode: _have_config = TRUE")
     # Extract include directories from the imported GeoTIFF target for use by tests
     get_target_property(GEOTIFF_INCLUDE_DIRS ${_GEOTIFF_TARGET} INTERFACE_INCLUDE_DIRECTORIES)
+    get_target_property(TIFF_INCLUDE_DIRS TIFF::TIFF INTERFACE_INCLUDE_DIRECTORIES)
+
+    message(STATUS "CONFIG: GEOTIFF_INCLUDE_DIRS = ${GEOTIFF_INCLUDE_DIRS}")
+    message(STATUS "CONFIG: TIFF_INCLUDE_DIRS = ${TIFF_INCLUDE_DIRS}")
+
     # Propagate to parent scope so tests can include headers
     set(GEOTIFF_INCLUDE_DIRS "${GEOTIFF_INCLUDE_DIRS}" PARENT_SCOPE)
+    set(TIFF_INCLUDE_DIRS "${TIFF_INCLUDE_DIRS}" PARENT_SCOPE)
 else()
     message(STATUS "Using pkg-config/manual mode: _have_config = FALSE")
 endif()
@@ -192,6 +198,13 @@ message(STATUS "Building ${GEOTIFF_VOL_NAME} with _have_config = ${_have_config}
 if (_have_config)
     message(STATUS "Using CONFIG targets: TIFF::TIFF and ${_GEOTIFF_TARGET}")
     target_link_libraries(${GEOTIFF_VOL_NAME} PRIVATE TIFF::TIFF ${_GEOTIFF_TARGET} HDF5::HDF5)
+    # On Windows/vcpkg, explicitly add include directories to ensure headers are found
+    if(GEOTIFF_INCLUDE_DIRS)
+        target_include_directories(${GEOTIFF_VOL_NAME} PRIVATE ${GEOTIFF_INCLUDE_DIRS})
+    endif()
+    if(TIFF_INCLUDE_DIRS)
+        target_include_directories(${GEOTIFF_VOL_NAME} PRIVATE ${TIFF_INCLUDE_DIRS})
+    endif()
 else()
     message(STATUS "Using manual libraries: ${TIFF_LIBRARIES} ${GEOTIFF_LIBRARIES}")
     message(STATUS "Adding include dirs: TIFF=${TIFF_INCLUDE_DIRS}")

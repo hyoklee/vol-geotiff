@@ -82,6 +82,10 @@ jobs:
         & "$env:VCPKG_ROOT\vcpkg.exe" install tiff[jpeg,lzma,zip,zstd]:x64-windows
         & "$env:VCPKG_ROOT\vcpkg.exe" install libgeotiff:x64-windows
 
+        # Debug: Check what was installed
+        Write-Host "Checking installed files..."
+        Get-ChildItem "$env:VCPKG_ROOT\installed\x64-windows\include" -Recurse -Filter "*geotiff*"
+
         # Set CMAKE_PREFIX_PATH for later steps
         echo "CMAKE_PREFIX_PATH=$env:VCPKG_ROOT\installed\x64-windows" >> $env:GITHUB_ENV
       shell: pwsh
@@ -209,11 +213,18 @@ jobs:
         $hdf5Dir = "${{ github.workspace }}/hdf5-${{ matrix.hdf5_version }}/cmake"
         $prefixPath = "$env:CMAKE_PREFIX_PATH;${{ github.workspace }}/hdf5-${{ matrix.hdf5_version }}"
 
+        Write-Host "HDF5_DIR: $hdf5Dir"
+        Write-Host "CMAKE_PREFIX_PATH: $prefixPath"
+        Write-Host "VCPKG_INSTALLATION_ROOT: $env:VCPKG_INSTALLATION_ROOT"
+
         cmake .. `
           -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} `
-          -DHDF5_DIR="$hdf5Dir" `
           -DCMAKE_PREFIX_PATH="$prefixPath" `
-          -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
+          -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
+          -DVCPKG_TARGET_TRIPLET=x64-windows
+
+        Write-Host "`nCMake configuration completed. Checking what was found..."
+        Get-Content CMakeCache.txt | Select-String -Pattern "GEOTIFF|TIFF|HDF5"
 
         cmake --build . --config ${{ matrix.build_type }} --parallel
       shell: pwsh
