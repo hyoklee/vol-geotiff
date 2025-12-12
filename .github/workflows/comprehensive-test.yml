@@ -17,14 +17,24 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]
         hdf5_version: ['develop']
-        compiler: [gcc, clang]
+        compiler: [gcc, clang, msvc]
         build_type: [Release, Debug]
         exclude:
           # Reduce matrix size for macOS (clang is default)
           - os: macos-latest
             compiler: gcc
+          - os: macos-latest
+            compiler: msvc
+          # Windows only uses MSVC
+          - os: windows-latest
+            compiler: gcc
+          - os: windows-latest
+            compiler: clang
+          # Linux doesn't use MSVC
+          - os: ubuntu-latest
+            compiler: msvc
 
     steps:
     - uses: actions/checkout@v6
@@ -61,6 +71,21 @@ jobs:
       run: |
         brew install cmake pkg-config libtiff libgeotiff
 
+    - name: Install Windows dependencies via vcpkg
+      if: runner.os == 'Windows'
+      run: |
+        # Use built-in vcpkg from GitHub Actions
+        $env:VCPKG_ROOT = $env:VCPKG_INSTALLATION_ROOT
+        Write-Host "Using vcpkg at: $env:VCPKG_ROOT"
+
+        # Install dependencies
+        & "$env:VCPKG_ROOT\vcpkg.exe" install tiff[jpeg,lzma,zip,zstd]:x64-windows
+        & "$env:VCPKG_ROOT\vcpkg.exe" install libgeotiff:x64-windows
+
+        # Set CMAKE_PREFIX_PATH for later steps
+        echo "CMAKE_PREFIX_PATH=$env:VCPKG_ROOT\installed\x64-windows" >> $env:GITHUB_ENV
+      shell: pwsh
+
     - name: Cache HDF5
       id: cache-hdf5
       uses: actions/cache@v4
@@ -68,8 +93,8 @@ jobs:
         path: ${{ github.workspace }}/hdf5-${{ matrix.hdf5_version }}
         key: hdf5-${{ matrix.hdf5_version }}-${{ matrix.os }}-${{ matrix.compiler }}-${{ github.run_number }}-${{ hashFiles('.github/workflows/comprehensive-test.yml') }}
 
-    - name: Build HDF5
-      if: steps.cache-hdf5.outputs.cache-hit != 'true'
+    - name: Build HDF5 (Unix)
+      if: steps.cache-hdf5.outputs.cache-hit != 'true' && runner.os != 'Windows'
       run: |
         cd ${{ github.workspace }}
         git clone --depth 1 --branch develop https://github.com/HDFGroup/hdf5.git hdf5-${{ matrix.hdf5_version }}
@@ -98,12 +123,44 @@ jobs:
         fi
         make install
 
-    - name: Verify test GeoTIFF files exist
+    - name: Build HDF5 (Windows)
+      if: steps.cache-hdf5.outputs.cache-hit != 'true' && runner.os == 'Windows'
+      run: |
+        cd ${{ github.workspace }}
+        git clone --depth 1 --branch develop https://github.com/HDFGroup/hdf5.git hdf5-${{ matrix.hdf5_version }}
+        cd hdf5-${{ matrix.hdf5_version }}
+        mkdir build
+        cd build
+
+        cmake .. `
+          -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} `
+          -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}/hdf5-${{ matrix.hdf5_version }}" `
+          -DHDF5_ENABLE_PARALLEL=OFF `
+          -DHDF5_BUILD_TOOLS=ON `
+          -DHDF5_BUILD_EXAMPLES=OFF `
+          -DHDF5_BUILD_TESTS=OFF `
+          -DBUILD_SHARED_LIBS=ON `
+          -DHDF5_ENABLE_Z_LIB_SUPPORT=ON
+
+        cmake --build . --config ${{ matrix.build_type }} --parallel
+        cmake --install . --config ${{ matrix.build_type }}
+      shell: pwsh
+
+    - name: Verify test GeoTIFF files exist (Unix)
+      if: runner.os != 'Windows'
       run: |
         echo "Using existing valid GeoTIFF test files from repository:"
         ls -lh test/*.tif | head -10
 
-    - name: Check libgeotiff header locations
+    - name: Verify test GeoTIFF files exist (Windows)
+      if: runner.os == 'Windows'
+      run: |
+        Write-Host "Using existing valid GeoTIFF test files from repository:"
+        Get-ChildItem test\*.tif | Select-Object -First 10 | Format-Table Name, Length
+      shell: pwsh
+
+    - name: Check libgeotiff header locations (macOS)
+      if: runner.os == 'macOS'
       run: |
         echo "=== Checking where geotiff headers are installed ==="
         find /opt/homebrew -name "geotiffio.h" 2>/dev/null || true
@@ -113,7 +170,8 @@ jobs:
         echo "=== Checking for geotiff subdirectory ==="
         ls -la /opt/homebrew/include/geotiff/ 2>/dev/null || echo "No geotiff subdirectory"
 
-    - name: Configure and build
+    - name: Configure and build (Unix)
+      if: runner.os != 'Windows'
       run: |
         mkdir build && cd build
 
@@ -142,7 +200,26 @@ jobs:
           make -j$(nproc)
         fi
 
-    - name: Run comprehensive tests
+    - name: Configure and build (Windows)
+      if: runner.os == 'Windows'
+      run: |
+        mkdir build
+        cd build
+
+        $hdf5Dir = "${{ github.workspace }}/hdf5-${{ matrix.hdf5_version }}/cmake"
+        $prefixPath = "$env:CMAKE_PREFIX_PATH;${{ github.workspace }}/hdf5-${{ matrix.hdf5_version }}"
+
+        cmake .. `
+          -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} `
+          -DHDF5_DIR="$hdf5Dir" `
+          -DCMAKE_PREFIX_PATH="$prefixPath" `
+          -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
+
+        cmake --build . --config ${{ matrix.build_type }} --parallel
+      shell: pwsh
+
+    - name: Run comprehensive tests (Unix)
+      if: runner.os != 'Windows'
       run: |
         cd build
         export HDF5_PLUGIN_PATH=$PWD/src
@@ -164,6 +241,30 @@ jobs:
           fi
         done
 
+    - name: Run comprehensive tests (Windows)
+      if: runner.os == 'Windows'
+      run: |
+        cd build
+        $env:HDF5_PLUGIN_PATH = "$PWD\src\${{ matrix.build_type }};$PWD\src"
+        $env:PATH = "${{ github.workspace }}\hdf5-${{ matrix.hdf5_version }}\bin\${{ matrix.build_type }};$env:VCPKG_INSTALLATION_ROOT\installed\x64-windows\bin;$env:PATH"
+        $env:HDF5_VOL_CONNECTOR = ""
+
+        # Run basic tests
+        ctest -C ${{ matrix.build_type }} --output-on-failure
+
+        # Test with a few different GeoTIFF files to verify comprehensive support
+        $testFiles = @("..\test\byte.tif", "..\test\uint16.tif", "..\test\int32.tif", "..\test\byte_zstd.tif")
+        foreach ($tiffFile in $testFiles) {
+          if (Test-Path $tiffFile) {
+            Write-Host "Testing with $tiffFile"
+            & ".\test\${{ matrix.build_type }}\test_runner.exe" real_file_test $tiffFile
+            if ($LASTEXITCODE -ne 0) {
+              Write-Host "Test failed for $tiffFile"
+            }
+          }
+        }
+      shell: pwsh
+
     - name: Memory leak test (Linux only)
       if: runner.os == 'Linux' && matrix.build_type == 'Debug'
       run: |
@@ -179,7 +280,8 @@ jobs:
           valgrind --leak-check=full --error-exitcode=1 ./test/test_runner real_file_test ../test/byte.tif
         fi
 
-    - name: Performance test
+    - name: Performance test (Unix)
+      if: runner.os != 'Windows'
       run: |
         cd build
         export HDF5_PLUGIN_PATH=$PWD/src
@@ -194,6 +296,23 @@ jobs:
           echo "Performance test:"
           time ./test/test_runner real_file_test ../test/uint16.tif
         fi
+
+    - name: Performance test (Windows)
+      if: runner.os == 'Windows'
+      run: |
+        cd build
+        $env:HDF5_PLUGIN_PATH = "$PWD\src\${{ matrix.build_type }};$PWD\src"
+        $env:PATH = "${{ github.workspace }}\hdf5-${{ matrix.hdf5_version }}\bin\${{ matrix.build_type }};$env:VCPKG_INSTALLATION_ROOT\installed\x64-windows\bin;$env:PATH"
+        $env:HDF5_VOL_CONNECTOR = ""
+
+        # Simple performance timing
+        if (Test-Path "..\test\uint16.tif") {
+          Write-Host "Performance test:"
+          Measure-Command {
+            & ".\test\${{ matrix.build_type }}\test_runner.exe" real_file_test "..\test\uint16.tif"
+          } | Select-Object TotalSeconds
+        }
+      shell: pwsh
 
     - name: Upload test artifacts on failure
       if: failure()
