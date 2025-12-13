@@ -278,43 +278,75 @@ jobs:
       run: |
         cd build
 
+        # Debug: Check HDF5 installation structure
+        Write-Host "Checking HDF5 installation..."
+        $hdf5Root = "${{ github.workspace }}\hdf5-${{ matrix.hdf5_version }}"
+        Write-Host "HDF5 root: $hdf5Root"
+        if (Test-Path $hdf5Root) {
+          Write-Host "`nHDF5 directory structure:"
+          Get-ChildItem $hdf5Root | Format-Table Name
+          Write-Host "`nChecking for bin directories:"
+          Get-ChildItem "$hdf5Root\bin" -ErrorAction SilentlyContinue | Format-Table Name
+          if (Test-Path "$hdf5Root\bin") {
+            Write-Host "`nDLLs in bin:"
+            Get-ChildItem "$hdf5Root\bin\*.dll" -Recurse -ErrorAction SilentlyContinue | Format-Table FullName
+          }
+        }
+
         # Copy DLLs to test directory for reliable access
-        Write-Host "Copying required DLLs to test directory..."
+        Write-Host "`nCopying required DLLs to test directory..."
         $testDir = ".\test\${{ matrix.build_type }}"
-        $hdf5BinDir = "${{ github.workspace }}\hdf5-${{ matrix.hdf5_version }}\bin\${{ matrix.build_type }}"
+
+        # Try multiple possible HDF5 bin locations
+        $hdf5BinDirs = @(
+          "${{ github.workspace }}\hdf5-${{ matrix.hdf5_version }}\bin\${{ matrix.build_type }}",
+          "${{ github.workspace }}\hdf5-${{ matrix.hdf5_version }}\bin"
+        )
+
         $vcpkgBinDir = "$env:VCPKG_INSTALLATION_ROOT\installed\x64-windows\bin"
         $volBinDir = ".\src\${{ matrix.build_type }}"
 
-        # Copy HDF5 DLLs
-        if (Test-Path $hdf5BinDir) {
-          Copy-Item "$hdf5BinDir\*.dll" $testDir -ErrorAction SilentlyContinue
-          Write-Host "Copied HDF5 DLLs from $hdf5BinDir"
+        # Copy HDF5 DLLs from first location that exists
+        $hdf5Found = $false
+        foreach ($hdf5BinDir in $hdf5BinDirs) {
+          if (Test-Path $hdf5BinDir) {
+            $dlls = Get-ChildItem "$hdf5BinDir\*.dll" -ErrorAction SilentlyContinue
+            if ($dlls) {
+              Copy-Item "$hdf5BinDir\*.dll" $testDir -Force -ErrorAction SilentlyContinue
+              Write-Host "Copied HDF5 DLLs from $hdf5BinDir"
+              Write-Host "  Found $($dlls.Count) DLL(s): $($dlls.Name -join ', ')"
+              $hdf5Found = $true
+              break
+            }
+          }
+        }
+
+        if (-not $hdf5Found) {
+          Write-Host "WARNING: No HDF5 DLLs found in any expected location!"
         }
 
         # Copy vcpkg DLLs (tiff, geotiff, zlib, zstd, etc.)
         if (Test-Path $vcpkgBinDir) {
-          Copy-Item "$vcpkgBinDir\*.dll" $testDir -ErrorAction SilentlyContinue
+          Copy-Item "$vcpkgBinDir\*.dll" $testDir -Force -ErrorAction SilentlyContinue
           Write-Host "Copied vcpkg DLLs from $vcpkgBinDir"
         }
 
         # Copy VOL connector DLL
         if (Test-Path $volBinDir) {
-          Copy-Item "$volBinDir\*.dll" $testDir -ErrorAction SilentlyContinue
+          Copy-Item "$volBinDir\*.dll" $testDir -Force -ErrorAction SilentlyContinue
           Write-Host "Copied VOL connector DLL from $volBinDir"
         }
 
         # List DLLs in test directory
-        Write-Host "`nDLLs in test directory:"
-        Get-ChildItem $testDir -Filter "*.dll" | Format-Table Name
+        Write-Host "`nAll DLLs in test directory:"
+        Get-ChildItem $testDir -Filter "*.dll" | Format-Table Name, Length
 
         # Set environment variables
         $env:HDF5_PLUGIN_PATH = "$PWD\src\${{ matrix.build_type }};$PWD\src"
-        $env:PATH = "$hdf5BinDir;$vcpkgBinDir;$env:PATH"
         $env:HDF5_VOL_CONNECTOR = ""
 
         Write-Host "`nEnvironment variables:"
         Write-Host "HDF5_PLUGIN_PATH: $env:HDF5_PLUGIN_PATH"
-        Write-Host "PATH (first 3 entries): $(($env:PATH -split ';')[0..2] -join ';')"
 
         # Run basic tests
         ctest -C ${{ matrix.build_type }} --output-on-failure
