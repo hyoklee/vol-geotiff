@@ -35,6 +35,9 @@ jobs:
           # Linux doesn't use MSVC
           - os: ubuntu-latest
             compiler: msvc
+          # Skip Windows Debug: vcpkg libs are Release-only, causing DLL mismatch
+          - os: windows-latest
+            build_type: Debug
 
     steps:
     - uses: actions/checkout@v6
