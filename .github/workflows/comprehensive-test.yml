@@ -275,6 +275,7 @@ jobs:
 
     - name: Run comprehensive tests (Windows)
       if: runner.os == 'Windows'
+      timeout-minutes: 30
       run: |
         cd build
 
@@ -348,8 +349,9 @@ jobs:
         Write-Host "`nEnvironment variables:"
         Write-Host "HDF5_PLUGIN_PATH: $env:HDF5_PLUGIN_PATH"
 
-        # Run basic tests
-        ctest -C ${{ matrix.build_type }} --output-on-failure
+        # Run basic tests with timeout
+        Write-Host "`nRunning tests with 60 second timeout per test..."
+        ctest -C ${{ matrix.build_type }} --output-on-failure --timeout 60
 
         # Test with a few different GeoTIFF files to verify comprehensive support
         $testFiles = @("..\test\byte.tif", "..\test\uint16.tif", "..\test\int32.tif", "..\test\byte_zstd.tif")
