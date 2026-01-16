@@ -421,7 +421,7 @@ jobs:
 
     - name: Upload test artifacts on failure
       if: failure()
-      uses: actions/upload-artifact@v5
+      uses: actions/upload-artifact@v6
       with:
         name: test-failure-${{ matrix.os }}-${{ matrix.hdf5_version }}-${{ matrix.compiler }}-${{ matrix.build_type }}
         path: |
