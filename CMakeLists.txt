@@ -17,13 +17,16 @@ if(NOT HDF5_FOUND)
     message(FATAL_ERROR "HDF5 CONFIG package not found. Set CMAKE_PREFIX_PATH or HDF5_DIR to your HDF5 install.")
 endif()
 
-# For now, require shared library
-if (NOT TARGET hdf5-shared)
-    message(FATAL_ERROR "hdf5-shared target not found in HDF5 package.")
+# For now, require shared library - check for both namespaced and non-namespaced targets
+if (TARGET hdf5::hdf5-shared)
+    # vcpkg-style namespaced target
+    add_library(HDF5::HDF5 ALIAS hdf5::hdf5-shared)
+elseif (TARGET hdf5-shared)
+    # Traditional HDF5 target
+    add_library(HDF5::HDF5 ALIAS hdf5-shared)
+else()
+    message(FATAL_ERROR "hdf5-shared or hdf5::hdf5-shared target not found in HDF5 package.")
 endif()
-
-# Create alias target to paper over specific HDF5 provided
-add_library(HDF5::HDF5 ALIAS hdf5-shared)
 
 # Extract HDF5 include directories for use by targets/tests
 get_target_property(HDF5_INCLUDE_DIRS HDF5::HDF5 INTERFACE_INCLUDE_DIRECTORIES)
@@ -59,13 +62,24 @@ if(NOT _TIFF_TARGET)
     # Manual discovery for TIFF in standard system locations
     message(STATUS "Attempting manual discovery of libtiff")
     find_path(TIFF_INCLUDE_DIR tiffio.h)
-    find_library(TIFF_LIBRARY NAMES tiff)
+    find_library(TIFF_LIBRARY_RELEASE NAMES tiff)
 
-    if(NOT TIFF_INCLUDE_DIR OR NOT TIFF_LIBRARY)
+    if(NOT TIFF_INCLUDE_DIR OR NOT TIFF_LIBRARY_RELEASE)
         message(FATAL_ERROR "libtiff not found. Ensure TIFF is installed (e.g., via apt/brew) or provide headers/libs.")
     endif()
 
-    message(STATUS "Found TIFF via manual discovery: ${TIFF_LIBRARY}")
+    # For vcpkg, debug libs are in a parallel debug/lib directory
+    get_filename_component(_TIFF_LIB_DIR "${TIFF_LIBRARY_RELEASE}" DIRECTORY)
+    get_filename_component(_TIFF_ROOT "${_TIFF_LIB_DIR}" DIRECTORY)
+    find_library(TIFF_LIBRARY_DEBUG NAMES tiffd
+        HINTS "${_TIFF_ROOT}/debug/lib" "${_TIFF_LIB_DIR}")
+
+    # For backwards compatibility
+    set(TIFF_LIBRARY "${TIFF_LIBRARY_RELEASE}")
+    message(STATUS "Found TIFF via manual discovery: ${TIFF_LIBRARY_RELEASE}")
+    if(TIFF_LIBRARY_DEBUG)
+        message(STATUS "Found TIFF debug library: ${TIFF_LIBRARY_DEBUG}")
+    endif()
 endif()
 
 # Create unified TIFF target for all potential TIFF sources
@@ -74,10 +88,16 @@ if(_TIFF_TARGET)
     # Wrap the found target
     target_link_libraries(Tiff::Tiff INTERFACE ${_TIFF_TARGET})
 else()
-    # Wrap manual discovery results
-    set_target_properties(Tiff::Tiff PROPERTIES
-        INTERFACE_LINK_LIBRARIES "${TIFF_LIBRARY}"
-        INTERFACE_INCLUDE_DIRECTORIES "${TIFF_INCLUDE_DIR}")
+    # Wrap manual discovery results with debug/release handling
+    if(TIFF_LIBRARY_DEBUG)
+        set_target_properties(Tiff::Tiff PROPERTIES
+            INTERFACE_LINK_LIBRARIES "$<IF:$<CONFIG:Debug>,${TIFF_LIBRARY_DEBUG},${TIFF_LIBRARY_RELEASE}>"
+            INTERFACE_INCLUDE_DIRECTORIES "${TIFF_INCLUDE_DIR}")
+    else()
+        set_target_properties(Tiff::Tiff PROPERTIES
+            INTERFACE_LINK_LIBRARIES "${TIFF_LIBRARY_RELEASE}"
+            INTERFACE_INCLUDE_DIRECTORIES "${TIFF_INCLUDE_DIR}")
+    endif()
 endif()
 
 # === GeoTIFF Setup ===
