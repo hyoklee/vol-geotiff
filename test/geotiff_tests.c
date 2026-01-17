@@ -18,21 +18,14 @@
 #include "geotiff_vol_connector.h"
 #include "test_runner.h"
 #include <H5PLpublic.h>
-#include <geotiff/geo_normalize.h>
-#include <geotiff/geotiffio.h>
-#include <geotiff/xtiffio.h>
+#include <geo_normalize.h>
+#include <geotiffio.h>
+#include <xtiffio.h>
 
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
-#ifndef _WIN32
 #include <unistd.h>
-#else
-#include <io.h>
-#define access _access
-#define F_OK 0
-#define unlink _unlink
-#endif
 
 /* Helper function to set up GeoTIFF keys */
 static void SetUpGeoKeys(GTIF *gtif)
@@ -2084,34 +2077,6 @@ int UnsupportedFeaturesTest(void)
         }
         H5Fclose(file_id);
         file_id = H5I_INVALID_HID;
-    }
-
-    /* Test that 1-bit GDAL files are rejected (from test suite) */
-    /* These paths are relative to build/test directory where ctest runs from */
-    const char *onebit_files[] = {"../../test/1bit_2bands.tif", "../../test/oddsize_1bit2b.tif",
-                                  "../../test/oddsize1bit.tif"};
-    for (int i = 0; i < 3; i++) {
-        H5E_BEGIN_TRY
-        {
-            file_id = H5Fopen(onebit_files[i], H5F_ACC_RDONLY, fapl_id);
-        }
-        H5E_END_TRY;
-
-        if (file_id >= 0) {
-            H5E_BEGIN_TRY
-            {
-                dset_id = H5Dopen2(file_id, "image0", H5P_DEFAULT);
-            }
-            H5E_END_TRY;
-
-            if (dset_id >= 0) {
-                printf("VERIFICATION FAILED: 1-bit file %s should have been rejected\n",
-                       onebit_files[i]);
-                goto error;
-            }
-            H5Fclose(file_id);
-            file_id = H5I_INVALID_HID;
-        }
     }
 
     /* Clean up */

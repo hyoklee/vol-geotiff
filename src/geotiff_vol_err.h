@@ -17,27 +17,10 @@ extern "C" {
 /* Identifiers for HDF5's error API */
 extern hid_t H5_geotiff_err_stack_g;
 extern hid_t H5_geotiff_err_class_g;
-extern hid_t H5_geotiff_obj_err_maj_g;
-extern hid_t H5_geotiff_parse_err_min_g;
-extern hid_t H5_geotiff_link_table_err_min_g;
-extern hid_t H5_geotiff_link_table_iter_err_min_g;
-extern hid_t H5_geotiff_attr_table_err_min_g;
-extern hid_t H5_geotiff_attr_table_iter_err_min_g;
-extern hid_t H5_geotiff_object_table_err_min_g;
-extern hid_t H5_geotiff_object_table_iter_err_min_g;
 
 #define HDF5_VOL_GEOTIFF_ERR_CLS_NAME "HDF5 GEOTIFF VOL"
 #define HDF5_VOL_GEOTIFF_LIB_NAME "HDF5 GEOTIFF VOL"
 #define HDF5_VOL_GEOTIFF_LIB_VER "1.0.0"
-
-#define H5E_OBJECT H5_geotiff_obj_err_maj_g
-#define H5E_PARSEERROR H5_geotiff_parse_err_min_g
-#define H5E_CANTBUILDLINKTABLE H5_geotiff_link_table_err_min_g
-#define H5E_CANTBUILDATTRTABLE H5_geotiff_attr_table_err_min_g
-#define H5E_CANTBUILDOBJECTTABLE H5_geotiff_object_table_err_min_g
-#define H5E_LINKITERERROR H5_geotiff_link_table_iter_err_min_g
-#define H5E_ATTRITERERROR H5_geotiff_attr_table_iter_err_min_g
-#define H5E_OBJECTITERERROR H5_geotiff_object_table_iter_err_min_g
 
 #define SUCCEED 0
 #define FAIL (-1)
@@ -254,28 +237,6 @@ extern hid_t H5_geotiff_object_table_iter_err_min_g;
  * should print additional information to stdout indented by at least four
  * spaces.
  */
-#ifdef RV_CONNECTOR_DEBUG
-#define TESTING(S)                                                                                 \
-    {                                                                                              \
-        printf("Testing %-66s\n\n", S);                                                            \
-        fflush(stdout);                                                                            \
-    }
-#define PASSED()                                                                                   \
-    {                                                                                              \
-        puts("PASSED\n");                                                                          \
-        fflush(stdout);                                                                            \
-    }
-#define H5_FAILED()                                                                                \
-    {                                                                                              \
-        puts("*FAILED*\n");                                                                        \
-        fflush(stdout);                                                                            \
-    }
-#define SKIPPED()                                                                                  \
-    {                                                                                              \
-        puts("- SKIPPED -\n");                                                                     \
-        fflush(stdout);                                                                            \
-    }
-#else
 #define TESTING(S)                                                                                 \
     {                                                                                              \
         printf("Testing %-66s", S);                                                                \
@@ -296,7 +257,6 @@ extern hid_t H5_geotiff_object_table_iter_err_min_g;
         puts("- SKIPPED -");                                                                       \
         fflush(stdout);                                                                            \
     }
-#endif
 
 #define TEST_ERROR                                                                                 \
     {                                                                                              \

@@ -5,59 +5,167 @@ project (geotiff_vol VERSION 1.0.0 DESCRIPTION "HDF5 VOL connector for GeoTIFF f
 enable_testing ()
 include (CTest)
 
-# Find HDF5 (prefer CONFIG mode). Try lowercase first (HDF5 develop installs 'hdf5'), then uppercase
-set(_HDF5_FOUND FALSE)
-find_package (hdf5 COMPONENTS C CONFIG QUIET)
-if (hdf5_FOUND)
-    set(_HDF5_FOUND TRUE)
-else()
-    find_package (HDF5 COMPONENTS C CONFIG QUIET)
-    if (HDF5_FOUND)
-        set(_HDF5_FOUND TRUE)
-    endif()
-endif()
-# Ensure HDF5 target alias exists before extracting include dirs
-if (NOT _HDF5_FOUND)
+# Embed the paths to TIFF/GEOTIFF libraries in the built library
+# so that HDF5 can find them at runtime
+set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+
+# === HDF5 setup ===
+# Find HDF5 and set up alias target
+find_package(HDF5 COMPONENTS C CONFIG)
+
+if(NOT HDF5_FOUND)
     message(FATAL_ERROR "HDF5 CONFIG package not found. Set CMAKE_PREFIX_PATH or HDF5_DIR to your HDF5 install.")
 endif()
 
-# Normalize HDF5 target name so downstream can always link HDF5::HDF5
-if (NOT TARGET HDF5::HDF5)
-    if (TARGET hdf5::hdf5)
-        add_library(HDF5::HDF5 ALIAS hdf5::hdf5)
-    elseif (TARGET hdf5::hdf5-shared)
-        add_library(HDF5::HDF5 ALIAS hdf5::hdf5-shared)
-    elseif (TARGET HDF5::HDF5_C)
-        # Some configs expose HDF5_C as the C library target
-        add_library(HDF5::HDF5 ALIAS HDF5::HDF5_C)
-    elseif (TARGET hdf5-shared)
-        add_library(HDF5::HDF5 ALIAS hdf5-shared)
-    elseif (TARGET hdf5-static)
-        add_library(HDF5::HDF5 ALIAS hdf5-static)
-    elseif (TARGET hdf5)
-        add_library(HDF5::HDF5 ALIAS hdf5)
+# For now, require shared library
+if (NOT TARGET hdf5-shared)
+    message(FATAL_ERROR "hdf5-shared target not found in HDF5 package.")
+endif()
+
+# Create alias target to paper over specific HDF5 provided
+add_library(HDF5::HDF5 ALIAS hdf5-shared)
+
+# Extract HDF5 include directories for use by targets/tests
+get_target_property(HDF5_INCLUDE_DIRS HDF5::HDF5 INTERFACE_INCLUDE_DIRECTORIES)
+
+# === TIFF Setup ===
+# Find TIFF - try config first, then allow CMake's FindTIFF.cmake module
+find_package(TIFF CONFIG)
+if(NOT TIFF_FOUND)
+    find_package(TIFF)  # Try to use FindTIFF module
+endif()
+
+# Determine which TIFF target is available
+set(_TIFF_TARGET "")
+if(TARGET TIFF::TIFF)
+    set(_TIFF_TARGET TIFF::TIFF)
+    message(STATUS "Found TIFF target: ${_TIFF_TARGET}")
+endif()
+
+# If no TIFF target was found via config, try pkg-config then manual discovery
+if(NOT _TIFF_TARGET)
+    find_package(PkgConfig QUIET)
+    if(PKG_CONFIG_FOUND)
+        message(STATUS "Attempting pkg-config discovery of libtiff")
+        pkg_check_modules(TIFF QUIET IMPORTED_TARGET libtiff-4)
+        if(TIFF_FOUND)
+            set(_TIFF_TARGET "PkgConfig::TIFF")
+            message(STATUS "Found TIFF via pkg-config: ${_TIFF_TARGET}")
+        endif()
     endif()
 endif()
 
-# Extract HDF5 include directories for use by targets/tests
-if (TARGET HDF5::HDF5)
-    get_target_property(HDF5_INCLUDE_DIRS HDF5::HDF5 INTERFACE_INCLUDE_DIRECTORIES)
+if(NOT _TIFF_TARGET)
+    # Manual discovery for TIFF in standard system locations
+    message(STATUS "Attempting manual discovery of libtiff")
+    find_path(TIFF_INCLUDE_DIR tiffio.h)
+    find_library(TIFF_LIBRARY NAMES tiff)
+
+    if(NOT TIFF_INCLUDE_DIR OR NOT TIFF_LIBRARY)
+        message(FATAL_ERROR "libtiff not found. Ensure TIFF is installed (e.g., via apt/brew) or provide headers/libs.")
+    endif()
+
+    message(STATUS "Found TIFF via manual discovery: ${TIFF_LIBRARY}")
 endif()
 
-# Note: This connector targets the modern HDF5 VOL API (1.15+). Ensure your HDF5 matches.
+# Create unified TIFF target for all potential TIFF sources
+add_library(Tiff::Tiff INTERFACE IMPORTED)
+if(_TIFF_TARGET)
+    # Wrap the found target
+    target_link_libraries(Tiff::Tiff INTERFACE ${_TIFF_TARGET})
+else()
+    # Wrap manual discovery results
+    set_target_properties(Tiff::Tiff PROPERTIES
+        INTERFACE_LINK_LIBRARIES "${TIFF_LIBRARY}"
+        INTERFACE_INCLUDE_DIRECTORIES "${TIFF_INCLUDE_DIR}")
+endif()
 
-# (moved aliasing section above)
+# === GeoTIFF Setup ===
+# Find GeoTIFF
+find_package(GeoTIFF CONFIG)
+if(NOT GeoTIFF_FOUND)
+    find_package(geotiff CONFIG)
+endif()
 
-# It's really easy to pick up the wrong HDF5 library if you set the path
-# wrong. Turn this on for added confirmation that you got it right.
-#message (DEPRECATION "Include: ${HDF5_INCLUDE_DIR}")
+# Determine which GeoTIFF target is available
+set(_GEOTIFF_TARGET "")
+foreach(geotiff_candidate IN ITEMS geotiff::geotiff GeoTIFF::geotiff GeoTIFF::GeoTIFF geotiff_library)
+    if(TARGET ${geotiff_candidate})
+        set(_GEOTIFF_TARGET ${geotiff_candidate})
+        message(STATUS "Found GeoTIFF target: ${_GEOTIFF_TARGET}")
+        # break()
+    endif()
+endforeach()
+if(NOT _GEOTIFF_TARGET)
+    message(STATUS "No GeoTIFF CMake target found")
+endif()
+
+# If no GeoTIFF target was found via config, try pkg-config then manual discovery
+if(NOT _GEOTIFF_TARGET)
+    find_package(PkgConfig QUIET)
+    if(PKG_CONFIG_FOUND)
+        message(STATUS "Attempting pkg-config discovery of libgeotiff")
+        pkg_check_modules(GEOTIFF QUIET IMPORTED_TARGET libgeotiff)
+        if(GEOTIFF_FOUND)
+            set(_GEOTIFF_TARGET "PkgConfig::GEOTIFF")
+            message(STATUS "Found GeoTIFF via pkg-config: ${_GEOTIFF_TARGET}")
+        endif()
+    endif()
+endif()
+
+if(NOT _GEOTIFF_TARGET)
+    # Manual discovery for GeoTIFF in standard system locations
+    message(STATUS "Attempting manual discovery of libgeotiff")
+    find_path(GEOTIFF_INCLUDE_DIR geotiff/geotiff.h
+        PATHS /usr/include /opt/homebrew/include /usr/local/include)
+    find_library(GEOTIFF_LIBRARY NAMES geotiff
+        PATHS /usr/lib /usr/lib/x86_64-linux-gnu /opt/homebrew/lib /usr/local/lib)
+
+    if(NOT GEOTIFF_INCLUDE_DIR OR NOT GEOTIFF_LIBRARY)
+        message(FATAL_ERROR "libgeotiff not found. Ensure GeoTIFF is installed (e.g., via apt/brew) or provide headers/libs.")
+    endif()
+
+    message(STATUS "Found GeoTIFF via manual discovery: ${GEOTIFF_LIBRARY}")
+endif()
+
+# Create unified GeoTIFF target for all potential GeoTIFF sources
+add_library(GeoTiff::GeoTiff INTERFACE IMPORTED)
+if(_GEOTIFF_TARGET)
+    # Wrap the found target
+    target_link_libraries(GeoTiff::GeoTiff INTERFACE ${_GEOTIFF_TARGET})
+
+    # Extract and adjust include directories from the imported GeoTIFF target
+    get_target_property(GEOTIFF_INCLUDE_DIRS ${_GEOTIFF_TARGET} INTERFACE_INCLUDE_DIRECTORIES)
+    if(GEOTIFF_INCLUDE_DIRS)
+        set(_GEOTIFF_ADJUSTED_INCLUDES "")
+        foreach(_dir ${GEOTIFF_INCLUDE_DIRS})
+            if(EXISTS "${_dir}/geotiff/geotiff.h")
+                list(APPEND _GEOTIFF_ADJUSTED_INCLUDES "${_dir}/geotiff")
+            else()
+                list(APPEND _GEOTIFF_ADJUSTED_INCLUDES "${_dir}")
+            endif()
+        endforeach()
+        set(GEOTIFF_INCLUDE_DIRS "${_GEOTIFF_ADJUSTED_INCLUDES}")
+    endif()
+else()
+    # Wrap manual discovery results
+    set(GEOTIFF_INCLUDE_DIRS ${GEOTIFF_INCLUDE_DIR})
+    # Add common geotiff subdirectory to include path if it exists
+    if(EXISTS "${GEOTIFF_INCLUDE_DIR}/geotiff")
+        list(APPEND GEOTIFF_INCLUDE_DIRS "${GEOTIFF_INCLUDE_DIR}/geotiff")
+    endif()
+
+    set_target_properties(GeoTiff::GeoTiff PROPERTIES
+        INTERFACE_LINK_LIBRARIES "${GEOTIFF_LIBRARY}"
+        INTERFACE_INCLUDE_DIRECTORIES "${GEOTIFF_INCLUDE_DIRS}")
+endif()
 
 # Build options
-option (GEOTIFF_BUILD_EXAMPLES "Build example programs" ON)
+option (GEOTIFF_VOL_BUILD_EXAMPLES "Build example programs" ON)
 
 add_subdirectory (src)
 add_subdirectory (test)
 
-if (GEOTIFF_BUILD_EXAMPLES)
+if (GEOTIFF_VOL_BUILD_EXAMPLES)
     add_subdirectory (examples)
 endif()

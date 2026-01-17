@@ -5,11 +5,11 @@
 
 #include "test_runner.h"
 #include "geotiff_vol_connector.h"
-#include <geotiff/geotiffio.h>
-#include <geotiff/xtiffio.h>
+#include <geotiffio.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <xtiffio.h>
 
 /* Helper functions for generating test files */
 static void SetUpGrayscaleTIFF(TIFF *tif);
