@@ -88,7 +88,7 @@ jobs:
         mkdir build && cd build
         cmake .. \
           -DCMAKE_BUILD_TYPE=Release \
-          -DHDF5_DIR=${{ github.workspace }}/hdf5-install/share/cmake \
+          -DHDF5_DIR=${{ github.workspace }}/hdf5-install/cmake \
           -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/geotiff-vol-install
         make -j$(nproc)
         make install
