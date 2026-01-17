@@ -1593,13 +1593,18 @@ herr_t geotiff_term_connector(void)
     return ret_value;
 }
 
-herr_t geotiff_introspect_get_conn_cls(void __attribute__((unused)) * obj,
-                                       H5VL_get_conn_lvl_t __attribute__((unused)) lvl,
-                                       const H5VL_class_t __attribute__((unused)) * *conn_cls)
+herr_t geotiff_introspect_get_conn_cls(void GEOTIFF_UNUSED_PARAM * obj,
+                                       H5VL_get_conn_lvl_t GEOTIFF_UNUSED_PARAM lvl,
+                                       const H5VL_class_t GEOTIFF_UNUSED_PARAM * *conn_cls)
 {
     herr_t ret_value = SUCCEED;
 
     assert(conn_cls);
+
+#ifdef _MSC_VER
+    GEOTIFF_UNUSED(obj);
+    GEOTIFF_UNUSED(lvl);
+#endif
 
     /* Retrieve the VOL connector class */
     *conn_cls = &geotiff_class_g;
@@ -1825,12 +1830,16 @@ done:
     return ret_value;
 }
 
-herr_t geotiff_introspect_get_cap_flags(const void __attribute__((unused)) * info,
+herr_t geotiff_introspect_get_cap_flags(const void GEOTIFF_UNUSED_PARAM * info,
                                         uint64_t *cap_flags)
 {
     herr_t ret_value = SUCCEED;
 
     assert(cap_flags);
+
+#ifdef _MSC_VER
+    GEOTIFF_UNUSED(info);
+#endif
 
     /* Set capability flags for the GeoTIFF VOL connector */
 

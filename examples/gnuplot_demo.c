@@ -9,6 +9,21 @@
  * Must be run from the build directory
  */
 
+/* Windows compatibility */
+#ifdef _WIN32
+#define _USE_MATH_DEFINES
+#include <windows.h>
+#include <direct.h>
+#include <io.h>
+#ifndef PATH_MAX
+#define PATH_MAX MAX_PATH
+#endif
+#define getcwd _getcwd
+#define chmod(path, mode) _chmod(path, _S_IREAD | _S_IWRITE)
+#define setenv(name, value, overwrite) _putenv_s(name, value)
+#define S_ISDIR(m) (((m) & _S_IFMT) == _S_IFDIR)
+#endif
+
 #include <hdf5.h>
 #include <limits.h>
 #include <math.h>
@@ -16,7 +31,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#ifndef _WIN32
 #include <unistd.h>
+#endif
 
 #include <geotiffio.h>
 #include <xtiffio.h>

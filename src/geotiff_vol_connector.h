@@ -24,6 +24,15 @@
 #include <stdint.h>
 #include <tiffio.h>
 
+/* Cross-platform unused parameter macro */
+#ifdef _MSC_VER
+#define GEOTIFF_UNUSED(x) (void)(x)
+#define GEOTIFF_UNUSED_PARAM
+#else
+#define GEOTIFF_UNUSED(x)
+#define GEOTIFF_UNUSED_PARAM __attribute__((unused))
+#endif
+
 /* The value must be between 256 and 65535 (inclusive) */
 #define GEOTIFF_VOL_CONNECTOR_VALUE ((H5VL_class_value_t) 12203)
 #define GEOTIFF_VOL_CONNECTOR_NAME "geotiff_vol_connector"
@@ -131,10 +140,10 @@ herr_t geotiff_compute_coordinates(const geotiff_dataset_t *dset, void *buf, hid
 herr_t geotiff_introspect_opt_query(void *obj, H5VL_subclass_t subcls, int opt_type,
                                     uint64_t *flags);
 
-herr_t geotiff_introspect_get_conn_cls(void __attribute__((unused)) * obj,
-                                       H5VL_get_conn_lvl_t __attribute__((unused)) lvl,
-                                       const H5VL_class_t __attribute__((unused)) * *conn_cls);
+herr_t geotiff_introspect_get_conn_cls(void GEOTIFF_UNUSED_PARAM * obj,
+                                       H5VL_get_conn_lvl_t GEOTIFF_UNUSED_PARAM lvl,
+                                       const H5VL_class_t GEOTIFF_UNUSED_PARAM * *conn_cls);
 
-herr_t geotiff_introspect_get_cap_flags(const void __attribute__((unused)) * info,
+herr_t geotiff_introspect_get_cap_flags(const void GEOTIFF_UNUSED_PARAM * info,
                                         uint64_t *cap_flags);
 #endif /* _geotiff_vol_connector_H */

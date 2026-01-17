@@ -15,6 +15,14 @@
  *              functionality through the GeoTIFF VOL connector.
  */
 
+/* Windows compatibility */
+#ifdef _WIN32
+#include <io.h>
+#define access _access
+#define F_OK 0
+#define unlink _unlink
+#endif
+
 #include "geotiff_vol_connector.h"
 #include "test_runner.h"
 #include <H5PLpublic.h>
@@ -25,7 +33,9 @@
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
+#ifndef _WIN32
 #include <unistd.h>
+#endif
 
 /* Helper function to set up GeoTIFF keys */
 static void SetUpGeoKeys(GTIF *gtif)
