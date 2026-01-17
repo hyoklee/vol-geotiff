@@ -15,7 +15,7 @@ jobs:
       id: create_release
       uses: softprops/action-gh-release@v2
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
       with:
         tag_name: ${{ github.ref_name }}
         name: GeoTIFF VOL Connector ${{ github.ref_name }}
@@ -116,7 +116,7 @@ jobs:
     - name: Upload Release Asset
       uses: softprops/action-gh-release@v2
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
       with:
         tag_name: ${{ github.ref_name }}
         files: ./geotiff-vol-connector-linux-${{ matrix.arch }}.tar.gz
@@ -184,7 +184,7 @@ jobs:
     - name: Upload Release Asset
       uses: softprops/action-gh-release@v2
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
       with:
         tag_name: ${{ github.ref_name }}
         files: ./geotiff-vol-connector-macos.tar.gz
@@ -212,7 +212,7 @@ jobs:
     - name: Upload Source Asset
       uses: softprops/action-gh-release@v2
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
       with:
         tag_name: ${{ github.ref_name }}
         files: ./geotiff-vol-connector-source.tar.gz
