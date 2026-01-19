@@ -1593,9 +1593,9 @@ herr_t geotiff_term_connector(void)
     return ret_value;
 }
 
-herr_t geotiff_introspect_get_conn_cls(void GEOTIFF_UNUSED_PARAM * obj,
+herr_t geotiff_introspect_get_conn_cls(void GEOTIFF_UNUSED_PARAM *obj,
                                        H5VL_get_conn_lvl_t GEOTIFF_UNUSED_PARAM lvl,
-                                       const H5VL_class_t GEOTIFF_UNUSED_PARAM * *conn_cls)
+                                       const H5VL_class_t GEOTIFF_UNUSED_PARAM **conn_cls)
 {
     herr_t ret_value = SUCCEED;
 
@@ -1830,8 +1830,7 @@ done:
     return ret_value;
 }
 
-herr_t geotiff_introspect_get_cap_flags(const void GEOTIFF_UNUSED_PARAM * info,
-                                        uint64_t *cap_flags)
+herr_t geotiff_introspect_get_cap_flags(const void GEOTIFF_UNUSED_PARAM *info, uint64_t *cap_flags)
 {
     herr_t ret_value = SUCCEED;
 
