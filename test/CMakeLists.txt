@@ -24,8 +24,8 @@ else()
     set(_VCPKG_BIN_PATH "")
 endif()
 
-set(TEST_ENVIRONMENT "HDF5_PLUGIN_PATH=${PROJECT_BINARY_DIR}/src/$<CONFIG>\;${PROJECT_BINARY_DIR}/src;PATH=${PROJECT_BINARY_DIR}/test/$<CONFIG>\;${PROJECT_BINARY_DIR}/src/$<CONFIG>\;${_VCPKG_BIN_PATH}\;$ENV{PATH};HDF5_VOL_CONNECTOR=")
-set(TEST_WORKING_DIRECTORY "${PROJECT_BINARY_DIR}/test/$<CONFIG>")
+set(TEST_ENVIRONMENT "HDF5_PLUGIN_PATH=${PROJECT_BINARY_DIR}/src/$<CONFIG>\;${PROJECT_BINARY_DIR}/src;PATH=$<TARGET_FILE_DIR:test_runner>\;${PROJECT_BINARY_DIR}/src/$<CONFIG>\;${PROJECT_BINARY_DIR}/src\;${_VCPKG_BIN_PATH}\;$ENV{PATH};HDF5_VOL_CONNECTOR=")
+set(TEST_WORKING_DIRECTORY "$<TARGET_FILE_DIR:test_runner>")
 
 # Add the GeoTIFF test (if a sample GeoTIFF file exists)
 if(EXISTS "${PROJECT_SOURCE_DIR}/test/sample.tif")
@@ -146,7 +146,7 @@ foreach(TEST_FILE ${GDAL_TEST_FILES})
         add_test(NAME ${TEST_NAME}
                  COMMAND ${CMAKE_COMMAND} -E env
                          "HDF5_PLUGIN_PATH=${PROJECT_BINARY_DIR}/src/$<CONFIG>\;${PROJECT_BINARY_DIR}/src"
-                         "PATH=${PROJECT_BINARY_DIR}/test/$<CONFIG>\;${PROJECT_BINARY_DIR}/src/$<CONFIG>\;${_VCPKG_BIN_PATH}\;$ENV{PATH}"
+                         "PATH=$<TARGET_FILE_DIR:test_runner>\;${PROJECT_BINARY_DIR}/src/$<CONFIG>\;${PROJECT_BINARY_DIR}/src\;${_VCPKG_BIN_PATH}\;$ENV{PATH}"
                          "HDF5_VOL_CONNECTOR="
                          $<TARGET_FILE:test_runner> real_file_test "${PROJECT_SOURCE_DIR}/test/${TEST_FILE}")
         set_tests_properties(${TEST_NAME} PROPERTIES
