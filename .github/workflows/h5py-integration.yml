@@ -238,7 +238,7 @@ jobs:
 
       - name: Upload test artifacts
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: >-
             h5py-test-results-${{ matrix.os }}-
@@ -252,7 +252,7 @@ jobs:
 
       - name: Upload build artifacts on failure
         if: failure()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: >-
             build-logs-${{ matrix.os }}-
