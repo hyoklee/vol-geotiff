@@ -1790,9 +1790,8 @@ static herr_t link_iterate_callback(hid_t group, const char *name, const H5L_inf
 
     /* Accept imageN, latN, or lonN link names */
     int n = -1;
-    if (sscanf(name, "image%d", &n) != 1 &&
-        sscanf(name, "lat%d",   &n) != 1 &&
-        sscanf(name, "lon%d",   &n) != 1) {
+    if (sscanf(name, "image%d", &n) != 1 && sscanf(name, "lat%d", &n) != 1 &&
+        sscanf(name, "lon%d", &n) != 1) {
         printf("VERIFICATION FAILED: Unexpected link name '%s'\n", name);
         return -1;
     }
@@ -2751,8 +2750,8 @@ int CoordinatesAttributeGeographicTest(const char *unused)
     int lat_ndims = H5Sget_simple_extent_dims(lat_space, lat_dims, NULL);
     H5Sclose(lat_space);
     if (lat_ndims != 1 || lat_dims[0] != height) {
-        printf("lat0 should be 1D with length %u, got ndims=%d dim=%llu\n",
-               height, lat_ndims, lat_ndims >= 1 ? (unsigned long long)lat_dims[0] : 0ULL);
+        printf("lat0 should be 1D with length %u, got ndims=%d dim=%llu\n", height, lat_ndims,
+               lat_ndims >= 1 ? (unsigned long long) lat_dims[0] : 0ULL);
         H5Dclose(lat_id);
         goto error;
     }
@@ -2766,7 +2765,7 @@ int CoordinatesAttributeGeographicTest(const char *unused)
             goto error;
         }
         if (fabs(lat_buf[5] - (40.0 - 5 * 0.1)) > 1e-6) {
-            printf("lat0[5] expected %.6f, got %.6f\n", 40.0 - 5*0.1, lat_buf[5]);
+            printf("lat0[5] expected %.6f, got %.6f\n", 40.0 - 5 * 0.1, lat_buf[5]);
             H5Dclose(lat_id);
             goto error;
         }
@@ -2784,8 +2783,8 @@ int CoordinatesAttributeGeographicTest(const char *unused)
     int lon_ndims = H5Sget_simple_extent_dims(lon_space, lon_dims, NULL);
     H5Sclose(lon_space);
     if (lon_ndims != 1 || lon_dims[0] != width) {
-        printf("lon0 should be 1D with length %u, got ndims=%d dim=%llu\n",
-               width, lon_ndims, lon_ndims >= 1 ? (unsigned long long)lon_dims[0] : 0ULL);
+        printf("lon0 should be 1D with length %u, got ndims=%d dim=%llu\n", width, lon_ndims,
+               lon_ndims >= 1 ? (unsigned long long) lon_dims[0] : 0ULL);
         H5Dclose(lon_id);
         goto error;
     }
@@ -2940,7 +2939,7 @@ int CoordinatesAttributeProjectedTest(const char *unused)
             goto error;
         }
         /* Read and verify values are in reasonable range */
-        double *lat_data = malloc((size_t)height * width * sizeof(double));
+        double *lat_data = malloc((size_t) height * width * sizeof(double));
         if (lat_data) {
             H5Dread(lat_id_p, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, lat_data);
             for (uint32_t i = 0; i < height * width; i++) {
@@ -2972,7 +2971,7 @@ int CoordinatesAttributeProjectedTest(const char *unused)
             H5Dclose(lon_id_p);
             goto error;
         }
-        double *lon_data = malloc((size_t)height * width * sizeof(double));
+        double *lon_data = malloc((size_t) height * width * sizeof(double));
         if (lon_data) {
             H5Dread(lon_id_p, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, lon_data);
             for (uint32_t i = 0; i < height * width; i++) {
@@ -3198,8 +3197,9 @@ int RefCountCloseDatasetBeforeAttributeTest(void)
     /* coordinates attribute is now a scalar string */
     H5S_class_t space_class = H5Sget_simple_extent_type(space_id);
     if (space_class != H5S_SCALAR) {
-        printf("FAILED: Incorrect attribute dataspace class after dataset close (expected scalar, got %d)\n",
-               (int)space_class);
+        printf("FAILED: Incorrect attribute dataspace class after dataset close (expected scalar, "
+               "got %d)\n",
+               (int) space_class);
         goto error;
     }
 
@@ -3484,7 +3484,6 @@ int RealFileComprehensiveTest(const char *filename)
     printf("  Checking for spatial metadata...\n");
     TIFF *tif_check = XTIFFOpen(filename, "r");
     GTIF *gtif_check = NULL;
-    int has_spatial_data = 0;
 
     if (tif_check) {
         gtif_check = GTIFNew(tif_check);
@@ -3495,7 +3494,6 @@ int RealFileComprehensiveTest(const char *filename)
                 /* Also verify we can actually convert coordinates */
                 double x = 0.0, y = 0.0;
                 if (GTIFImageToPCS(gtif_check, &x, &y)) {
-                    has_spatial_data = 1;
                     printf(
                         "  INFO: File has complete geotransform data (can compute coordinates)\n");
                 } else {

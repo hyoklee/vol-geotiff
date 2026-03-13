@@ -42,10 +42,10 @@ typedef struct gdal_metadata_t gdal_metadata_t;
 
 /* GeoTIFF VOL file object structure */
 typedef struct geotiff_file_t {
-    TIFF *tiff;                /* TIFF file handle - shared across datasets */
-    char *filename;            /* File name */
-    unsigned int flags;        /* File access flags */
-    hid_t plist_id;            /* Property list ID */
+    TIFF *tiff;                 /* TIFF file handle - shared across datasets */
+    char *filename;             /* File name */
+    unsigned int flags;         /* File access flags */
+    hid_t plist_id;             /* Property list ID */
     gdal_metadata_t *gdal_meta; /* Parsed GDAL metadata (tag 42112) */
     /* NOTE: For thread safety with multi-image files, each dataset should
      * have its own TIFF handle via TIFFOpen(). Currently using shared handle. */
@@ -75,10 +75,10 @@ typedef struct geotiff_group_t {
 
 /* GeoTIFF VOL attribute object structure */
 typedef struct geotiff_attr_t {
-    void *parent;            /* Parent object (dataset, group, or file) */
-    char *name;              /* Attribute name */
-    hid_t type_id;           /* HDF5 datatype */
-    hid_t space_id;          /* HDF5 dataspace */
+    void *parent;   /* Parent object (dataset, group, or file) */
+    char *name;     /* Attribute name */
+    hid_t type_id;  /* HDF5 datatype */
+    hid_t space_id; /* HDF5 dataspace */
 } geotiff_attr_t;
 
 /* Unified GeoTIFF VOL object structure */
@@ -93,7 +93,6 @@ struct geotiff_object_t {
         geotiff_attr_t attr;
     } u;
 };
-
 
 /* Function prototypes (HDF5 develop expects hid_t vipl_id) */
 herr_t geotiff_init_connector(hid_t vipl_id);
@@ -133,11 +132,11 @@ herr_t geotiff_link_specific(void *obj, const H5VL_loc_params_t *loc_params,
 
 /* Attribute specific operation */
 herr_t geotiff_attr_specific(void *obj, const H5VL_loc_params_t *loc_params,
-                              H5VL_attr_specific_args_t *args, hid_t dxpl_id, void **req);
+                             H5VL_attr_specific_args_t *args, hid_t dxpl_id, void **req);
 
 /* Object get operation */
 herr_t geotiff_object_get(void *obj, const H5VL_loc_params_t *loc_params,
-                           H5VL_object_get_args_t *args, hid_t dxpl_id, void **req);
+                          H5VL_object_get_args_t *args, hid_t dxpl_id, void **req);
 
 /* Helper functions */
 herr_t geotiff_read_hyperslab(const geotiff_object_t *dset_obj, const hsize_t *start,
