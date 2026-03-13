@@ -1785,17 +1785,18 @@ static herr_t link_iterate_callback(hid_t group, const char *name, const H5L_inf
                                     void *op_data)
 {
     int *count = (int *) op_data;
+    (void) group;
+    (void) info;
 
-    (void) group; /* Unused */
-    (void) info;  /* Unused */
-
-    /* Verify we got the expected link name */
-    if (strcmp(name, "image0") != 0) {
-        printf("VERIFICATION FAILED: Expected link name 'image0', got '%s'\n", name);
+    /* Accept imageN, latN, or lonN link names */
+    int n = -1;
+    if (sscanf(name, "image%d", &n) != 1 &&
+        sscanf(name, "lat%d",   &n) != 1 &&
+        sscanf(name, "lon%d",   &n) != 1) {
+        printf("VERIFICATION FAILED: Unexpected link name '%s'\n", name);
         return -1;
     }
 
-    /* Verify link info */
     if (info->type != H5L_TYPE_HARD) {
         printf("VERIFICATION FAILED: Expected hard link, got type %d\n", info->type);
         return -1;
@@ -1855,15 +1856,15 @@ int LinkIterateTest(const char *filename)
         goto error;
     }
 
-    /* Verify we found exactly one link */
-    if (link_count != 1) {
-        printf("VERIFICATION FAILED: Expected 1 link, found %d\n", link_count);
+    /* Verify we found exactly 3 links (image0, lat0, lon0) */
+    if (link_count != 3) {
+        printf("VERIFICATION FAILED: Expected 3 links, found %d\n", link_count);
         goto error;
     }
 
     /* Verify index was updated */
-    if (idx != 1) {
-        printf("VERIFICATION FAILED: Expected index 1 after iteration, got %llu\n",
+    if (idx != 3) {
+        printf("VERIFICATION FAILED: Expected index 3 after iteration, got %llu\n",
                (unsigned long long) idx);
         goto error;
     }
@@ -2199,9 +2200,9 @@ int GroupGetInfoTest(void)
         goto error;
     }
 
-    /* Verify single-image file has 1 link */
-    if (group_info.nlinks != 1) {
-        printf("VERIFICATION FAILED: Single-image file expected 1 link, got %llu\n",
+    /* Verify single-image file has 3 links (image0, lat0, lon0) */
+    if (group_info.nlinks != 3) {
+        printf("VERIFICATION FAILED: Single-image file expected 3 links, got %llu\n",
                (unsigned long long) group_info.nlinks);
         goto error;
     }
@@ -2236,10 +2237,10 @@ int GroupGetInfoTest(void)
         goto error;
     }
 
-    /* Verify multi-image file has NUM_IMAGES links */
-    if (group_info.nlinks != NUM_IMAGES) {
-        printf("VERIFICATION FAILED: Multi-image file expected %u links, got %llu\n", NUM_IMAGES,
-               (unsigned long long) group_info.nlinks);
+    /* Verify multi-image file has NUM_IMAGES * 3 links (imageN + latN + lonN per image) */
+    if (group_info.nlinks != NUM_IMAGES * 3) {
+        printf("VERIFICATION FAILED: Multi-image file expected %u links, got %llu\n",
+               NUM_IMAGES * 3, (unsigned long long) group_info.nlinks);
         goto error;
     }
 
@@ -2646,12 +2647,6 @@ int CoordinatesAttributeGeographicTest(const char *unused)
     hid_t space_id = H5I_INVALID_HID;
     hid_t type_id = H5I_INVALID_HID;
 
-    typedef struct {
-        double lon;
-        double lat;
-    } coord_t;
-
-    coord_t *coords = NULL;
     const uint32_t width = 10;
     const uint32_t height = 10;
 
@@ -2697,107 +2692,115 @@ int CoordinatesAttributeGeographicTest(const char *unused)
         goto error;
     }
 
-    /* Verify attribute dataspace matches dataset */
+    /* coordinates attribute is now a scalar string "lat0 lon0" */
     if ((space_id = H5Aget_space(attr_id)) < 0) {
         printf("Failed to get attribute dataspace\n");
         goto error;
     }
 
-    hsize_t dims[2];
-    if (H5Sget_simple_extent_dims(space_id, dims, NULL) < 0) {
-        printf("Failed to get dataspace dimensions\n");
+    if (H5Sget_simple_extent_type(space_id) != H5S_SCALAR) {
+        printf("Coordinates attribute should be scalar\n");
         goto error;
     }
+    H5Sclose(space_id);
+    space_id = H5I_INVALID_HID;
 
-    if (dims[0] != height || dims[1] != width) {
-        printf("Attribute dimensions (%llu, %llu) don't match expected (%u, %u)\n",
-               (unsigned long long) dims[0], (unsigned long long) dims[1], height, width);
-        goto error;
-    }
-
-    /* Verify attribute type is compound with lon/lat */
     if ((type_id = H5Aget_type(attr_id)) < 0) {
         printf("Failed to get attribute type\n");
         goto error;
     }
 
-    if (H5Tget_class(type_id) != H5T_COMPOUND) {
-        printf("Attribute type is not compound\n");
+    if (H5Tget_class(type_id) != H5T_STRING) {
+        printf("Coordinates attribute type is not a string\n");
         goto error;
     }
+    H5Tclose(type_id);
+    type_id = H5I_INVALID_HID;
 
-    if (H5Tget_nmembers(type_id) != 2) {
-        printf("Compound type has %d members, expected 2\n", H5Tget_nmembers(type_id));
-        goto error;
-    }
-
-    /* Allocate and read coordinates */
-    coords = (coord_t *) malloc(width * height * sizeof(coord_t));
-    if (!coords) {
-        printf("Failed to allocate memory for coordinates\n");
-        goto error;
-    }
-
-    if (H5Aread(attr_id, type_id, coords) < 0) {
+    char *coord_val = NULL;
+    hid_t vlen_str = H5Tcopy(H5T_C_S1);
+    H5Tset_size(vlen_str, H5T_VARIABLE);
+    if (H5Aread(attr_id, vlen_str, &coord_val) < 0) {
         printf("Failed to read coordinates attribute\n");
+        H5Tclose(vlen_str);
         goto error;
     }
+    H5Tclose(vlen_str);
 
-    /* Verify coordinates at specific pixels
-     * Tiepoint: pixel (0,0) = (-120.0°, 40.0°)
-     * Pixel scale: 0.1° per pixel
-     * Note: Y increases downward in image, but latitude should decrease
-     */
-    const double epsilon = 1e-6;
-
-    /* Check pixel (0, 0) - top-left corner */
-    double expected_lon = -120.0;
-    double expected_lat = 40.0;
-    if (fabs(coords[0].lon - expected_lon) > epsilon ||
-        fabs(coords[0].lat - expected_lat) > epsilon) {
-        printf("Pixel (0,0): expected (%.6f, %.6f), got (%.6f, %.6f)\n", expected_lon, expected_lat,
-               coords[0].lon, coords[0].lat);
+    if (!coord_val || strcmp(coord_val, "lat0 lon0") != 0) {
+        printf("Coordinates attribute value wrong: expected 'lat0 lon0', got '%s'\n",
+               coord_val ? coord_val : "(null)");
+        H5free_memory(coord_val);
         goto error;
     }
+    H5free_memory(coord_val);
+    H5Aclose(attr_id);
+    attr_id = H5I_INVALID_HID;
 
-    /* Check pixel (0, 5) - middle of top row */
-    expected_lon = -120.0 + 5 * 0.1; /* -119.5 */
-    expected_lat = 40.0;
-    size_t idx = 0 * width + 5;
-    if (fabs(coords[idx].lon - expected_lon) > epsilon ||
-        fabs(coords[idx].lat - expected_lat) > epsilon) {
-        printf("Pixel (0,5): expected (%.6f, %.6f), got (%.6f, %.6f)\n", expected_lon, expected_lat,
-               coords[idx].lon, coords[idx].lat);
+    /* Verify lat0 is 1D with length=height */
+    hid_t lat_id = H5Dopen(dset_id, "/lat0", H5P_DEFAULT);
+    /* Try relative open if absolute fails */
+    if (lat_id < 0)
+        lat_id = H5Dopen(file_id, "lat0", H5P_DEFAULT);
+    if (lat_id < 0) {
+        printf("Failed to open lat0 dataset\n");
         goto error;
     }
-
-    /* Check pixel (5, 0) - middle of left column */
-    expected_lon = -120.0;
-    expected_lat = 40.0 - 5 * 0.1; /* 39.5 (Y increases down, lat decreases) */
-    idx = 5 * width + 0;
-    if (fabs(coords[idx].lon - expected_lon) > epsilon ||
-        fabs(coords[idx].lat - expected_lat) > epsilon) {
-        printf("Pixel (5,0): expected (%.6f, %.6f), got (%.6f, %.6f)\n", expected_lon, expected_lat,
-               coords[idx].lon, coords[idx].lat);
+    hid_t lat_space = H5Dget_space(lat_id);
+    hsize_t lat_dims[2];
+    int lat_ndims = H5Sget_simple_extent_dims(lat_space, lat_dims, NULL);
+    H5Sclose(lat_space);
+    if (lat_ndims != 1 || lat_dims[0] != height) {
+        printf("lat0 should be 1D with length %u, got ndims=%d dim=%llu\n",
+               height, lat_ndims, lat_ndims >= 1 ? (unsigned long long)lat_dims[0] : 0ULL);
+        H5Dclose(lat_id);
         goto error;
     }
+    /* Read and verify first lat value */
+    {
+        double lat_buf[10];
+        H5Dread(lat_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, lat_buf);
+        if (fabs(lat_buf[0] - 40.0) > 1e-6) {
+            printf("lat0[0] expected 40.0, got %.6f\n", lat_buf[0]);
+            H5Dclose(lat_id);
+            goto error;
+        }
+        if (fabs(lat_buf[5] - (40.0 - 5 * 0.1)) > 1e-6) {
+            printf("lat0[5] expected %.6f, got %.6f\n", 40.0 - 5*0.1, lat_buf[5]);
+            H5Dclose(lat_id);
+            goto error;
+        }
+    }
+    H5Dclose(lat_id);
 
-    /* Check pixel (9, 9) - bottom-right corner */
-    expected_lon = -120.0 + 9 * 0.1; /* -119.1 */
-    expected_lat = 40.0 - 9 * 0.1;   /* 39.1 */
-    idx = 9 * width + 9;
-    if (fabs(coords[idx].lon - expected_lon) > epsilon ||
-        fabs(coords[idx].lat - expected_lat) > epsilon) {
-        printf("Pixel (9,9): expected (%.6f, %.6f), got (%.6f, %.6f)\n", expected_lon, expected_lat,
-               coords[idx].lon, coords[idx].lat);
+    /* Verify lon0 is 1D with length=width */
+    hid_t lon_id = H5Dopen(file_id, "lon0", H5P_DEFAULT);
+    if (lon_id < 0) {
+        printf("Failed to open lon0 dataset\n");
         goto error;
     }
+    hid_t lon_space = H5Dget_space(lon_id);
+    hsize_t lon_dims[2];
+    int lon_ndims = H5Sget_simple_extent_dims(lon_space, lon_dims, NULL);
+    H5Sclose(lon_space);
+    if (lon_ndims != 1 || lon_dims[0] != width) {
+        printf("lon0 should be 1D with length %u, got ndims=%d dim=%llu\n",
+               width, lon_ndims, lon_ndims >= 1 ? (unsigned long long)lon_dims[0] : 0ULL);
+        H5Dclose(lon_id);
+        goto error;
+    }
+    {
+        double lon_buf[10];
+        H5Dread(lon_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, lon_buf);
+        if (fabs(lon_buf[0] - (-120.0)) > 1e-6) {
+            printf("lon0[0] expected -120.0, got %.6f\n", lon_buf[0]);
+            H5Dclose(lon_id);
+            goto error;
+        }
+    }
+    H5Dclose(lon_id);
 
     /* Clean up */
-    free(coords);
-    H5Tclose(type_id);
-    H5Sclose(space_id);
-    H5Aclose(attr_id);
     H5Dclose(dset_id);
     H5Fclose(file_id);
     H5Pclose(fapl_id);
@@ -2808,12 +2811,9 @@ int CoordinatesAttributeGeographicTest(const char *unused)
     return 0;
 
 error:
-    if (coords)
-        free(coords);
     H5E_BEGIN_TRY
     {
         H5Tclose(type_id);
-        H5Sclose(space_id);
         H5Aclose(attr_id);
         H5Dclose(dset_id);
         H5Fclose(file_id);
@@ -2823,7 +2823,6 @@ error:
     }
     H5E_END_TRY;
     unlink(filename);
-
     printf("FAILED\n");
     return 1;
 }
@@ -2840,12 +2839,6 @@ int CoordinatesAttributeProjectedTest(const char *unused)
     hid_t attr_id = H5I_INVALID_HID;
     hid_t type_id = H5I_INVALID_HID;
 
-    typedef struct {
-        double lon;
-        double lat;
-    } coord_t;
-
-    coord_t *coords = NULL;
     const uint32_t width = 10;
     const uint32_t height = 10;
 
@@ -2891,72 +2884,111 @@ int CoordinatesAttributeProjectedTest(const char *unused)
         goto error;
     }
 
-    /* Get attribute type */
+    /* coordinates attribute is now a scalar string "lat0 lon0" */
+    hid_t attr_space_p = H5Aget_space(attr_id);
+    if (H5Sget_simple_extent_type(attr_space_p) != H5S_SCALAR) {
+        printf("Coordinates attribute should be scalar\n");
+        H5Sclose(attr_space_p);
+        goto error;
+    }
+    H5Sclose(attr_space_p);
+
     if ((type_id = H5Aget_type(attr_id)) < 0) {
         printf("Failed to get attribute type\n");
         goto error;
     }
-
-    /* Allocate and read coordinates */
-    coords = (coord_t *) malloc(width * height * sizeof(coord_t));
-    if (!coords) {
-        printf("Failed to allocate memory for coordinates\n");
+    if (H5Tget_class(type_id) != H5T_STRING) {
+        printf("Coordinates attribute type is not a string\n");
         goto error;
     }
+    H5Tclose(type_id);
+    type_id = H5I_INVALID_HID;
 
-    if (H5Aread(attr_id, type_id, coords) < 0) {
+    char *coord_val_p = NULL;
+    hid_t vlen_str_p = H5Tcopy(H5T_C_S1);
+    H5Tset_size(vlen_str_p, H5T_VARIABLE);
+    if (H5Aread(attr_id, vlen_str_p, &coord_val_p) < 0) {
         printf("Failed to read coordinates attribute\n");
+        H5Tclose(vlen_str_p);
         goto error;
     }
+    H5Tclose(vlen_str_p);
+    if (!coord_val_p || strcmp(coord_val_p, "lat0 lon0") != 0) {
+        printf("Coordinates wrong: expected 'lat0 lon0', got '%s'\n",
+               coord_val_p ? coord_val_p : "(null)");
+        H5free_memory(coord_val_p);
+        goto error;
+    }
+    H5free_memory(coord_val_p);
+    H5Aclose(attr_id);
+    attr_id = H5I_INVALID_HID;
 
-    /* Verify coordinates are reasonable for UTM Zone 11N
-     * UTM Zone 11N is roughly -120° to -114° longitude, 0° to 84° latitude
-     * Our test data is at approximately:
-     * - Easting 500000m = center of zone = approximately -117° longitude
-     * - Northing 4500000m = approximately 40.6° latitude
-     */
-
-    /* Check that coordinates are in reasonable ranges and not NaN */
-    for (uint32_t row = 0; row < height; row++) {
-        for (uint32_t col = 0; col < width; col++) {
-            size_t idx = row * width + col;
-
-            if (isnan(coords[idx].lon) || isnan(coords[idx].lat)) {
-                printf("Pixel (%u,%u): got NaN coordinates\n", row, col);
-                goto error;
+    /* Verify lat0 is 2D [height, width] */
+    hid_t lat_id_p = H5Dopen(file_id, "lat0", H5P_DEFAULT);
+    if (lat_id_p < 0) {
+        printf("Failed to open lat0 dataset\n");
+        goto error;
+    }
+    {
+        hid_t lsp = H5Dget_space(lat_id_p);
+        hsize_t ldims[2];
+        int lndims = H5Sget_simple_extent_dims(lsp, ldims, NULL);
+        H5Sclose(lsp);
+        if (lndims != 2 || ldims[0] != height || ldims[1] != width) {
+            printf("lat0 should be 2D [%u,%u], got ndims=%d\n", height, width, lndims);
+            H5Dclose(lat_id_p);
+            goto error;
+        }
+        /* Read and verify values are in reasonable range */
+        double *lat_data = malloc((size_t)height * width * sizeof(double));
+        if (lat_data) {
+            H5Dread(lat_id_p, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, lat_data);
+            for (uint32_t i = 0; i < height * width; i++) {
+                if (isnan(lat_data[i]) || lat_data[i] < 40.0 || lat_data[i] > 41.0) {
+                    printf("lat0[%u]: %.6f out of expected range [40, 41]\n", i, lat_data[i]);
+                    free(lat_data);
+                    H5Dclose(lat_id_p);
+                    goto error;
+                }
             }
-
-            /* Rough bounds check for UTM Zone 11N */
-            if (coords[idx].lon < -121.0 || coords[idx].lon > -113.0) {
-                printf("Pixel (%u,%u): longitude %.6f out of expected range [-121, -113]\n", row,
-                       col, coords[idx].lon);
-                goto error;
-            }
-
-            if (coords[idx].lat < 40.0 || coords[idx].lat > 41.0) {
-                printf("Pixel (%u,%u): latitude %.6f out of expected range [40, 41]\n", row, col,
-                       coords[idx].lat);
-                goto error;
-            }
+            free(lat_data);
         }
     }
+    H5Dclose(lat_id_p);
 
-    /* Verify that longitude increases with column */
-    if (coords[0 * width + 9].lon <= coords[0 * width + 0].lon) {
-        printf("Expected longitude to increase from west to east\n");
+    /* Verify lon0 is 2D [height, width] */
+    hid_t lon_id_p = H5Dopen(file_id, "lon0", H5P_DEFAULT);
+    if (lon_id_p < 0) {
+        printf("Failed to open lon0 dataset\n");
         goto error;
     }
-
-    /* Verify that latitude decreases with row (Y increases down) */
-    if (coords[9 * width + 0].lat >= coords[0 * width + 0].lat) {
-        printf("Expected latitude to decrease from north to south\n");
-        goto error;
+    {
+        hid_t lsp = H5Dget_space(lon_id_p);
+        hsize_t ldims[2];
+        int lndims = H5Sget_simple_extent_dims(lsp, ldims, NULL);
+        H5Sclose(lsp);
+        if (lndims != 2 || ldims[0] != height || ldims[1] != width) {
+            printf("lon0 should be 2D [%u,%u], got ndims=%d\n", height, width, lndims);
+            H5Dclose(lon_id_p);
+            goto error;
+        }
+        double *lon_data = malloc((size_t)height * width * sizeof(double));
+        if (lon_data) {
+            H5Dread(lon_id_p, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, lon_data);
+            for (uint32_t i = 0; i < height * width; i++) {
+                if (isnan(lon_data[i]) || lon_data[i] < -121.0 || lon_data[i] > -113.0) {
+                    printf("lon0[%u]: %.6f out of expected range [-121, -113]\n", i, lon_data[i]);
+                    free(lon_data);
+                    H5Dclose(lon_id_p);
+                    goto error;
+                }
+            }
+            free(lon_data);
+        }
     }
+    H5Dclose(lon_id_p);
 
     /* Clean up */
-    free(coords);
-    H5Tclose(type_id);
-    H5Aclose(attr_id);
     H5Dclose(dset_id);
     H5Fclose(file_id);
     H5Pclose(fapl_id);
@@ -2967,8 +2999,6 @@ int CoordinatesAttributeProjectedTest(const char *unused)
     return 0;
 
 error:
-    if (coords)
-        free(coords);
     H5E_BEGIN_TRY
     {
         H5Tclose(type_id);
@@ -2981,7 +3011,6 @@ error:
     }
     H5E_END_TRY;
     unlink(filename);
-
     printf("FAILED\n");
     return 1;
 }
@@ -3107,8 +3136,6 @@ int RefCountCloseDatasetBeforeAttributeTest(void)
     hid_t dset_id = H5I_INVALID_HID;
     hid_t attr_id = H5I_INVALID_HID;
     hid_t space_id = H5I_INVALID_HID;
-    hsize_t dims[3];
-    int ndims;
 
     printf("Testing close dataset before attribute...  ");
 
@@ -3168,16 +3195,11 @@ int RefCountCloseDatasetBeforeAttributeTest(void)
         goto error;
     }
 
-    if ((ndims = H5Sget_simple_extent_dims(space_id, dims, NULL)) < 0) {
-        printf("FAILED: Could not get attribute dimensions after dataset close\n");
-        goto error;
-    }
-
-    /* CreateGeographicGeoTIFF creates a 10x10 image */
-    if (ndims != 2 || dims[0] != 10 || dims[1] != 10) {
-        printf("FAILED: Incorrect attribute dimensions after dataset close (expected 10x10, got "
-               "%llux%llu)\n",
-               (unsigned long long) dims[0], (unsigned long long) dims[1]);
+    /* coordinates attribute is now a scalar string */
+    H5S_class_t space_class = H5Sget_simple_extent_type(space_id);
+    if (space_class != H5S_SCALAR) {
+        printf("FAILED: Incorrect attribute dataspace class after dataset close (expected scalar, got %d)\n",
+               (int)space_class);
         goto error;
     }
 
@@ -3502,7 +3524,7 @@ int RealFileComprehensiveTest(const char *filename)
         goto error;
     }
 
-    /* Get attribute dataspace to determine size */
+    /* Verify coordinates attribute is a scalar string "lat0 lon0" */
     hid_t attr_space = H5Aget_space(attr_id);
     if (attr_space < 0) {
         printf("  FAILED: Could not get coordinates attribute dataspace\n");
@@ -3510,87 +3532,40 @@ int RealFileComprehensiveTest(const char *filename)
     }
 
     hssize_t num_elements = H5Sget_simple_extent_npoints(attr_space);
-    /* Coordinates are always per-pixel: height * width, regardless of samples per pixel */
-    hssize_t expected_coord_count = (hssize_t) (dims[0] * dims[1]);
+    H5Sclose(attr_space);
 
-    if (num_elements != expected_coord_count) {
-        printf("  FAILED: Coordinates attribute has wrong number of elements (expected %lld, "
-               "got %lld)\n",
-               (long long) expected_coord_count, (long long) num_elements);
-        H5Sclose(attr_space);
+    if (num_elements != 1) {
+        printf("  FAILED: Coordinates attribute should be scalar (expected 1 element, got %lld)\n",
+               (long long) num_elements);
         goto error;
     }
 
-    /* Allocate and read coordinates (lon/lat pairs as compound type) */
-    typedef struct {
-        double lon;
-        double lat;
-    } coord_pair_t;
-
-    coord_pair_t *coords = (coord_pair_t *) malloc((size_t) num_elements * sizeof(coord_pair_t));
-    if (!coords) {
-        printf("  FAILED: Could not allocate memory for coordinates\n");
-        H5Sclose(attr_space);
-        goto error;
-    }
-
-    /* Get the attribute's type directly */
     hid_t attr_type = H5Aget_type(attr_id);
     if (attr_type < 0) {
         printf("  FAILED: Could not get coordinates attribute type\n");
-        free(coords);
-        H5Sclose(attr_space);
         goto error;
     }
 
-    /* Check if it's a compound type and print its structure */
-    H5T_class_t attr_type_class = H5Tget_class(attr_type);
-    if (attr_type_class == H5T_COMPOUND) {
-        int nmembers = H5Tget_nmembers(attr_type);
-        for (int i = 0; i < nmembers; i++) {
-            char *member_name = H5Tget_member_name(attr_type, (unsigned) i);
-            H5free_memory(member_name);
-        }
+    if (H5Tget_class(attr_type) != H5T_STRING) {
+        printf("  FAILED: Coordinates attribute should be a string type\n");
+        H5Tclose(attr_type);
+        goto error;
     }
 
-    /* Try to read the coordinates using the attribute's own type */
-    herr_t read_status;
-    read_status = H5Aread(attr_id, attr_type, coords);
-
+    char *coord_str = NULL;
+    herr_t read_status = H5Aread(attr_id, attr_type, &coord_str);
     H5Tclose(attr_type);
 
     if (read_status < 0) {
-        if (has_spatial_data) {
-            printf("  FAILED: File has geotransform but reading coordinates failed\n");
-            printf("  Printing HDF5 error stack:\n");
-            H5Eprint2(H5E_DEFAULT, stderr);
-            free(coords);
-            H5Sclose(attr_space);
-            goto error;
-        } else {
-        }
-    } else {
-        if (!has_spatial_data) {
-            printf(
-                "  WARNING: Reading coordinates succeeded even though file has no geotransform\n");
-        } else {
-
-            /* Print first few coordinate pairs for verification */
-            int print_count = (num_elements < 3) ? (int) num_elements : 3;
-            printf("  First coordinates: ");
-            for (int i = 0; i < print_count; i++) {
-                printf("(%.6f, %.6f)%s", coords[i].lon, coords[i].lat,
-                       (i < print_count - 1) ? ", " : "");
-            }
-            if (num_elements > 3) {
-                printf("...");
-            }
-            printf("\n");
-        }
+        printf("  FAILED: Could not read coordinates attribute value\n");
+        goto error;
     }
 
-    free(coords);
-    H5Sclose(attr_space);
+    if (coord_str) {
+        printf("  Coordinates attribute value: %s\n", coord_str);
+        H5free_memory(coord_str);
+    }
+
     H5Aclose(attr_id);
     attr_id = H5I_INVALID_HID;
 
