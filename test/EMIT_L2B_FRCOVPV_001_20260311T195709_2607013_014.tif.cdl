@@ -13,24 +13,28 @@ dimensions:
 variables:
 	double image0(phony_dim_0, phony_dim_1) ;
 		string image0:coordinates = "lat0 lon0" ;
+		image0:_FillValue = -9999. ;
 	double lat0(phony_dim_0) ;
 		string lat0:units = "degrees_north" ;
 	double lon0(phony_dim_1) ;
 		string lon0:units = "degrees_east" ;
 	double image1(phony_dim_2, phony_dim_3) ;
 		string image1:coordinates = "lat1 lon1" ;
+		image1:_FillValue = -9999. ;
 	double lat1(phony_dim_2) ;
 		string lat1:units = "degrees_north" ;
 	double lon1(phony_dim_3) ;
 		string lon1:units = "degrees_east" ;
 	double image2(phony_dim_4, phony_dim_5) ;
 		string image2:coordinates = "lat2 lon2" ;
+		image2:_FillValue = -9999. ;
 	double lat2(phony_dim_4) ;
 		string lat2:units = "degrees_north" ;
 	double lon2(phony_dim_5) ;
 		string lon2:units = "degrees_east" ;
 	double image3(phony_dim_6, phony_dim_7) ;
 		string image3:coordinates = "lat3 lon3" ;
+		image3:_FillValue = -9999. ;
 	double lat3(phony_dim_6) ;
 		string lat3:units = "degrees_north" ;
 	double lon3(phony_dim_7) ;

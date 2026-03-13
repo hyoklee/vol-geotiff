@@ -15,6 +15,16 @@ export HDF5_PLUGIN_PATH="${VOL_BUILD}"
 export HDF5_VOL_CONNECTOR=geotiff_vol_connector
 export LD_LIBRARY_PATH="${HDF5_LIB}:${VOL_BUILD}:${LD_LIBRARY_PATH}"
 
+# Parse options
+HEADER_ONLY=0
+while getopts ":h" opt; do
+    case $opt in
+        h) HEADER_ONLY=1 ;;
+        *) ;;
+    esac
+done
+shift $((OPTIND - 1))
+
 # Test file - accept as argument or use default
 GEOTIFF_FILE="${1:-EMIT_L2B_FRCOVPV_001_20260311T195709_2607013_014.tif}"
 
@@ -26,13 +36,15 @@ fi
 echo "Testing ncdump with GeoTIFF file: $GEOTIFF_FILE"
 "${NCDUMP}" -h "$GEOTIFF_FILE" || echo "ncdump header failed"
 
-echo ""
-echo "Dumping lat0 values:"
-"${NCDUMP}" -v lat0 "$GEOTIFF_FILE" || echo "ncdump lat0 failed"
+if [ "$HEADER_ONLY" -eq 0 ]; then
+    echo ""
+    echo "Dumping lat0 values:"
+    "${NCDUMP}" -v lat0 "$GEOTIFF_FILE" || echo "ncdump lat0 failed"
 
-echo ""
-echo "Dumping lon0 values:"
-"${NCDUMP}" -v lon0 "$GEOTIFF_FILE" || echo "ncdump lon0 failed"
+    echo ""
+    echo "Dumping lon0 values:"
+    "${NCDUMP}" -v lon0 "$GEOTIFF_FILE" || echo "ncdump lon0 failed"
+fi
 
 echo ""
 echo "netCDF tools testing completed"

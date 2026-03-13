@@ -1619,20 +1619,26 @@ void *geotiff_attr_open(void *obj, const H5VL_loc_params_t *loc_params, const ch
             FUNC_GOTO_ERROR(H5E_ATTR, H5E_NOTFOUND, NULL,
                             "Metadata attribute '%s' not found", name);
     } else if (parent_obj->obj_type == H5I_DATASET && parent_obj->u.dataset.is_image) {
-        if (strcmp(name, "coordinates") != 0)
-            FUNC_GOTO_ERROR(H5E_ATTR, H5E_NOTFOUND, NULL,
-                            "Unknown attribute '%s' on image dataset", name);
         if ((attr->space_id = H5Screate(H5S_SCALAR)) < 0)
             FUNC_GOTO_ERROR(H5E_ATTR, H5E_CANTCREATE, NULL,
-                            "Failed to create scalar dataspace for coordinates attribute");
-        hid_t str_type = H5Tcopy(H5T_C_S1);
-        if (str_type < 0)
-            FUNC_GOTO_ERROR(H5E_ATTR, H5E_CANTCOPY, NULL, "Failed to copy string type");
-        if (H5Tset_size(str_type, H5T_VARIABLE) < 0) {
-            H5Tclose(str_type);
-            FUNC_GOTO_ERROR(H5E_ATTR, H5E_CANTSET, NULL, "Failed to set variable string size");
+                            "Failed to create scalar dataspace for image dataset attribute");
+        if (strcmp(name, "coordinates") == 0) {
+            hid_t str_type = H5Tcopy(H5T_C_S1);
+            if (str_type < 0)
+                FUNC_GOTO_ERROR(H5E_ATTR, H5E_CANTCOPY, NULL, "Failed to copy string type");
+            if (H5Tset_size(str_type, H5T_VARIABLE) < 0) {
+                H5Tclose(str_type);
+                FUNC_GOTO_ERROR(H5E_ATTR, H5E_CANTSET, NULL, "Failed to set variable string size");
+            }
+            attr->type_id = str_type;
+        } else if (strcmp(name, "_FillValue") == 0) {
+            if ((attr->type_id = H5Tcopy(parent_obj->u.dataset.type_id)) < 0)
+                FUNC_GOTO_ERROR(H5E_ATTR, H5E_CANTCOPY, NULL,
+                                "Failed to copy dataset type for _FillValue attribute");
+        } else {
+            FUNC_GOTO_ERROR(H5E_ATTR, H5E_NOTFOUND, NULL,
+                            "Unknown attribute '%s' on image dataset", name);
         }
-        attr->type_id = str_type;
     } else if (parent_obj->obj_type == H5I_DATASET && parent_obj->u.dataset.is_latlon) {
         if (strcmp(name, "units") != 0)
             FUNC_GOTO_ERROR(H5E_ATTR, H5E_NOTFOUND, NULL,
@@ -1695,6 +1701,54 @@ herr_t geotiff_attr_read(void *attr, hid_t __attribute__((unused)) mem_type_id, 
         /* Get number of directories and write to buffer */
         uint64_t num_dirs = (uint64_t) TIFFNumberOfDirectories(parent_obj->u.file.tiff);
         *((uint64_t *) buf) = num_dirs;
+    } else if (strcmp(a->name, "_FillValue") == 0) {
+        const geotiff_object_t *parent_obj = (const geotiff_object_t *)a->parent;
+        if (parent_obj->obj_type != H5I_DATASET || !parent_obj->u.dataset.is_image)
+            FUNC_GOTO_ERROR(H5E_ATTR, H5E_BADVALUE, FAIL,
+                            "_FillValue attribute only valid on image datasets");
+        const geotiff_file_t *file = &parent_obj->parent_file->u.file;
+        const char *nodata_str = NULL;
+        if (file->gdal_meta) {
+            for (int i = 0; i < file->gdal_meta->count; i++) {
+                if (strcmp(file->gdal_meta->items[i].key, "NoData") == 0) {
+                    nodata_str = file->gdal_meta->items[i].value;
+                    break;
+                }
+            }
+        }
+        if (!nodata_str)
+            FUNC_GOTO_ERROR(H5E_ATTR, H5E_NOTFOUND, FAIL,
+                            "No NoData value found in GeoTIFF metadata");
+        hid_t type_id = parent_obj->u.dataset.type_id;
+        H5T_class_t cls = H5Tget_class(type_id);
+        size_t sz = H5Tget_size(type_id);
+        double dval = strtod(nodata_str, NULL);
+        if (cls == H5T_FLOAT) {
+            if (sz == 4) { float fv = (float)dval; memcpy(buf, &fv, 4); }
+            else          { memcpy(buf, &dval, 8); }
+        } else if (cls == H5T_INTEGER) {
+            H5T_sign_t sgn = H5Tget_sign(type_id);
+            if (sgn == H5T_SGN_NONE) {
+                unsigned long long uv = (unsigned long long)dval;
+                switch (sz) {
+                    case 1: *(uint8_t  *)buf = (uint8_t )uv; break;
+                    case 2: *(uint16_t *)buf = (uint16_t)uv; break;
+                    case 4: *(uint32_t *)buf = (uint32_t)uv; break;
+                    default:*(uint64_t *)buf = (uint64_t)uv; break;
+                }
+            } else {
+                long long sv = (long long)dval;
+                switch (sz) {
+                    case 1: *(int8_t  *)buf = (int8_t )sv; break;
+                    case 2: *(int16_t *)buf = (int16_t)sv; break;
+                    case 4: *(int32_t *)buf = (int32_t)sv; break;
+                    default:*(int64_t *)buf = (int64_t)sv; break;
+                }
+            }
+        } else {
+            FUNC_GOTO_ERROR(H5E_ATTR, H5E_UNSUPPORTED, FAIL,
+                            "Unsupported type class for _FillValue");
+        }
     } else if (strcmp(a->name, "coordinates") == 0) {
         const geotiff_object_t *parent_obj = (const geotiff_object_t *)a->parent;
         if (parent_obj->obj_type != H5I_DATASET || !parent_obj->u.dataset.is_image)
@@ -1831,57 +1885,71 @@ herr_t geotiff_attr_specific(void *obj, const H5VL_loc_params_t __attribute__((u
             H5VL_attr_iterate_args_t *iter = &args->args.iterate;
             const geotiff_file_t *file = &o->parent_file->u.file;
             const gdal_metadata_t *meta = file->gdal_meta;
-            hsize_t start_idx;
             hid_t loc_id = H5I_INVALID_HID;
 
             if (!iter)
                 FUNC_GOTO_ERROR(H5E_ATTR, H5E_BADVALUE, FAIL, "Invalid iterator args");
 
+            hsize_t start_idx = iter->idx ? *iter->idx : 0;
+
             /* For dataset objects, expose per-dataset attributes */
             if (o->obj_type == H5I_DATASET) {
-                const char *attr_name = NULL;
-                size_t attr_data_size = 0;
-                char coord_val[32];
+                /* Build attribute list for this dataset type */
+                static const char *latlon_attrs[]  = {"units"};
+                static const char *image_attr_names[] = {"coordinates", "_FillValue"};
+
+                const char **attr_list = NULL;
+                int num_attrs = 0;
+                const char *nodata_str = NULL;
 
                 if (o->u.dataset.is_latlon) {
-                    attr_name = "units";
-                    attr_data_size = strlen("degrees_north") + 1;
+                    attr_list = latlon_attrs;
+                    num_attrs = 1;
                 } else if (o->u.dataset.is_image) {
-                    snprintf(coord_val, sizeof(coord_val),
-                             "lat%d lon%d", o->u.dataset.directory_index,
-                             o->u.dataset.directory_index);
-                    attr_name = "coordinates";
-                    attr_data_size = strlen(coord_val) + 1;
+                    /* Check if NoData exists */
+                    if (meta) {
+                        for (int k = 0; k < meta->count; k++) {
+                            if (strcmp(meta->items[k].key, "NoData") == 0) {
+                                nodata_str = meta->items[k].value;
+                                break;
+                            }
+                        }
+                    }
+                    attr_list = image_attr_names;
+                    num_attrs = nodata_str ? 2 : 1;
                 } else {
                     break;
                 }
 
-                if (start_idx > 0)
-                    break; /* only one attribute per dataset */
+                if (start_idx >= (hsize_t)num_attrs)
+                    break;
+
                 o->ref_count++;
                 if ((loc_id = H5VLwrap_register((void *)o, H5I_DATASET)) < 0) {
                     o->ref_count--;
                     FUNC_GOTO_ERROR(H5E_ATTR, H5E_CANTREGISTER, FAIL,
                                     "Failed to wrap dataset for attribute iteration");
                 }
-                if (iter->idx) *iter->idx = 0;
-                if (iter->op) {
+
+                for (hsize_t i = start_idx; i < (hsize_t)num_attrs; i++) {
+                    if (iter->idx) *iter->idx = i;
+                    if (!iter->op) continue;
                     H5A_info_t ainfo;
                     memset(&ainfo, 0, sizeof(H5A_info_t));
-                    ainfo.data_size = attr_data_size;
-                    herr_t cb_ret = iter->op(loc_id, attr_name, &ainfo, iter->op_data);
-                    if (iter->idx) *iter->idx = 1;
-                    H5Idec_ref(loc_id);
-                    if (cb_ret < 0)
+                    ainfo.data_size = strlen(attr_list[i]) + 1;
+                    herr_t cb_ret = iter->op(loc_id, attr_list[i], &ainfo, iter->op_data);
+                    if (iter->idx) *iter->idx = i + 1;
+                    if (cb_ret < 0) {
+                        H5Idec_ref(loc_id);
                         FUNC_GOTO_ERROR(H5E_ATTR, H5E_BADITER, FAIL,
                                         "Attribute iterator callback returned error");
-                    else if (cb_ret > 0) {
+                    } else if (cb_ret > 0) {
+                        H5Idec_ref(loc_id);
                         ret_value = cb_ret;
                         goto done;
                     }
-                } else {
-                    H5Idec_ref(loc_id);
                 }
+                H5Idec_ref(loc_id);
                 break;
             }
 
@@ -1906,9 +1974,6 @@ herr_t geotiff_attr_specific(void *obj, const H5VL_loc_params_t __attribute__((u
                                     "Failed to wrap object for attribute iteration");
                 }
             }
-
-            /* iter->idx may be NULL if caller passed NULL to H5Aiterate2 */
-            start_idx = iter->idx ? *iter->idx : 0;
 
             for (hsize_t i = start_idx; i < (hsize_t)meta->count; i++) {
                 H5A_info_t ainfo;
@@ -1951,7 +2016,18 @@ herr_t geotiff_attr_specific(void *obj, const H5VL_loc_params_t __attribute__((u
             if (o->obj_type == H5I_DATASET && o->u.dataset.is_latlon) {
                 found = (strcmp(name, "units") == 0);
             } else if (o->obj_type == H5I_DATASET && o->u.dataset.is_image) {
-                found = (strcmp(name, "coordinates") == 0);
+                if (strcmp(name, "coordinates") == 0) {
+                    found = true;
+                } else if (strcmp(name, "_FillValue") == 0) {
+                    if (meta) {
+                        for (int k = 0; k < meta->count; k++) {
+                            if (strcmp(meta->items[k].key, "NoData") == 0) {
+                                found = true;
+                                break;
+                            }
+                        }
+                    }
+                }
             } else if ((o->obj_type == H5I_FILE || o->obj_type == H5I_GROUP) && meta) {
                 for (int i = 0; i < meta->count; i++) {
                     if (strcmp(meta->items[i].key, name) == 0) {

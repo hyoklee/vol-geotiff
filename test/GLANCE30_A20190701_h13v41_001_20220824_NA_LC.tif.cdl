@@ -7,6 +7,7 @@ dimensions:
 variables:
 	ubyte image0(phony_dim_0, phony_dim_1) ;
 		string image0:coordinates = "lat0 lon0" ;
+		image0:_FillValue = 255UB ;
 	double lat0(phony_dim_0, phony_dim_1) ;
 		string lat0:units = "degrees_north" ;
 	double lon0(phony_dim_0, phony_dim_1) ;
