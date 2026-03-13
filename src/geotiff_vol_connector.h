@@ -37,12 +37,16 @@
 #define GEOTIFF_VOL_CONNECTOR_VALUE ((H5VL_class_value_t) 12203)
 #define GEOTIFF_VOL_CONNECTOR_NAME "geotiff_vol_connector"
 
+/* Forward declaration for GDAL metadata type used in geotiff_file_t */
+typedef struct gdal_metadata_t gdal_metadata_t;
+
 /* GeoTIFF VOL file object structure */
 typedef struct geotiff_file_t {
-    TIFF *tiff;         /* TIFF file handle - shared across datasets */
-    char *filename;     /* File name */
-    unsigned int flags; /* File access flags */
-    hid_t plist_id;     /* Property list ID */
+    TIFF *tiff;                /* TIFF file handle - shared across datasets */
+    char *filename;            /* File name */
+    unsigned int flags;        /* File access flags */
+    hid_t plist_id;            /* Property list ID */
+    gdal_metadata_t *gdal_meta; /* Parsed GDAL metadata (tag 42112) */
     /* NOTE: For thread safety with multi-image files, each dataset should
      * have its own TIFF handle via TIFFOpen(). Currently using shared handle. */
 } geotiff_file_t;
@@ -129,6 +133,14 @@ herr_t geotiff_attr_close(void *attr, hid_t dxpl_id, void **req);
 /* Link operations */
 herr_t geotiff_link_specific(void *obj, const H5VL_loc_params_t *loc_params,
                              H5VL_link_specific_args_t *args, hid_t dxpl_id, void **req);
+
+/* Attribute specific operation */
+herr_t geotiff_attr_specific(void *obj, const H5VL_loc_params_t *loc_params,
+                              H5VL_attr_specific_args_t *args, hid_t dxpl_id, void **req);
+
+/* Object get operation */
+herr_t geotiff_object_get(void *obj, const H5VL_loc_params_t *loc_params,
+                           H5VL_object_get_args_t *args, hid_t dxpl_id, void **req);
 
 /* Helper functions */
 herr_t geotiff_read_hyperslab(const geotiff_object_t *dset_obj, const hsize_t *start,

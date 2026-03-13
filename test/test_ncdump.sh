@@ -4,26 +4,27 @@
 
 echo "Testing netCDF tools with GeoTIFF VOL connector"
 
-# Set plugin path for HDF5 VOL connector
-export HDF5_PLUGIN_PATH="../src"
-export HDF5_VOL_CONNECTOR=geotiff_vol_connector
+# Paths to the custom-built HDF5 and netcdf-c
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+VOL_BUILD="${SCRIPT_DIR}/../build-x86/src"
+HDF5_LIB="${HOME}/hdf5/install-x86/lib"
+NCDUMP="${HOME}/netcdf-c/build-x86/ncdump/ncdump"
 
-# Test file (should be a GeoTIFF file)
-GEOTIFF_FILE="sample.tif"
+# Set plugin path for HDF5 VOL connector
+export HDF5_PLUGIN_PATH="${VOL_BUILD}"
+export HDF5_VOL_CONNECTOR=geotiff_vol_connector
+export LD_LIBRARY_PATH="${HDF5_LIB}:${VOL_BUILD}:${LD_LIBRARY_PATH}"
+
+# Test file - accept as argument or use default
+GEOTIFF_FILE="${1:-EMIT_L2B_FRCOVPV_001_20260311T195709_2607013_014.tif}"
 
 if [ ! -f "$GEOTIFF_FILE" ]; then
-    echo "Creating a simple test GeoTIFF file..."
-    echo "Please provide a GeoTIFF file named $GEOTIFF_FILE for testing"
+    echo "GeoTIFF file not found: $GEOTIFF_FILE"
     exit 1
 fi
 
 echo "Testing ncdump with GeoTIFF file: $GEOTIFF_FILE"
-ncdump -h "$GEOTIFF_FILE" || echo "ncdump header failed"
+"${NCDUMP}" -h "$GEOTIFF_FILE" || echo "ncdump header failed"
 
-echo "Testing ncdump with variables:"
-ncdump -v image "$GEOTIFF_FILE" || echo "ncdump variables failed"
-
-echo "Testing ncinfo if available:"
-which ncinfo > /dev/null 2>&1 && ncinfo "$GEOTIFF_FILE" || echo "ncinfo not available or failed"
-
+echo ""
 echo "netCDF tools testing completed"

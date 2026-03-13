@@ -1,0 +1,61 @@
+Testing netCDF tools with GeoTIFF VOL connector
+Testing ncdump with GeoTIFF file: EMIT_L2B_FRCOVPV_001_20260311T195709_2607013_014.tif
+netcdf EMIT_L2B_FRCOVPV_001_20260311T195709_2607013_014 {
+dimensions:
+	phony_dim_0 = 1910 ;
+	phony_dim_1 = 2088 ;
+	phony_dim_2 = 955 ;
+	phony_dim_3 = 1044 ;
+	phony_dim_4 = 477 ;
+	phony_dim_5 = 522 ;
+	phony_dim_6 = 238 ;
+	phony_dim_7 = 261 ;
+variables:
+	double image0(phony_dim_0, phony_dim_1) ;
+	double image1(phony_dim_2, phony_dim_3) ;
+	double image2(phony_dim_4, phony_dim_5) ;
+	double image3(phony_dim_6, phony_dim_7) ;
+
+// global attributes:
+		string :Conventions = "CF-1.13" ;
+		string :creator_name = "Jet Propulsion Laboratory/California Institute of Technology" ;
+		string :creator_url = "https://earth.jpl.nasa.gov/emit/" ;
+		string :date_created = "2026-03-12T04:40:30Z" ;
+		string :description = "Photosynthetic Vegetation Fractional Cover Values" ;
+		string :identifier_product_doi_authority = "https://doi.org" ;
+		string :institution = "NASA Jet Propulsion Laboratory/California Institute of Technology" ;
+		string :instrument = "EMIT" ;
+		string :keywords = "Imaging Spectroscopy, minerals, EMIT, dust, radiative forcing" ;
+		string :keywords_vocabulary = "NASA Global Change Master Directory (GCMD) Science Keywords" ;
+		string :license = "https://www.earthdata.nasa.gov/engage/open-data-services-software-policies/data-use-guidance" ;
+		string :naming_authority = "LPDAAC" ;
+		string :platform = "ISS" ;
+		string :product_version = "001" ;
+		string :project = "Earth Surface Mineral Dust Source Investigation" ;
+		string :project_url = "https://earth.jpl.nasa.gov/emit/" ;
+		string :publisher_email = "lpdaac@usgs.gov" ;
+		string :publisher_name = "NASA LPDAAC" ;
+		string :publisher_url = "https://lpdaac.usgs.gov" ;
+		string :sensor = "EMIT (Earth Surface Mineral Dust Source Investigation)" ;
+		string :software_build_version = "010634" ;
+		string :stdname_vocabulary = "NetCDF Climate and Forecast (CF) Metadata Convention" ;
+		string :UNITS = "fraction" ;
+		string :DESCRIPTION = "EMIT_L2B_FRCOVPV" ;
+		string :GeoTransform = "-66.3879725875888 0.000542232520256367 0 -21.7161939578649 0 -0.000542232520256367" ;
+		string :origin = "(-66.3879725875888, -21.7161939578649)" ;
+		string :pixel_size = "(0.000542232520256367, -0.000542232520256367)" ;
+		string :CornerCoordinates_UpperLeft = "(-66.3879726, -21.7161940)" ;
+		string :CornerCoordinates_LowerLeft = "(-66.3879726, -22.7518581)" ;
+		string :CornerCoordinates_UpperRight = "(-65.2557911, -21.7161940)" ;
+		string :CornerCoordinates_LowerRight = "(-65.2557911, -22.7518581)" ;
+		string :CornerCoordinates_Center = "(-65.8218818, -22.2340260)" ;
+		string :coordinate_system = "EPSG:4326 (WGS 84)" ;
+		string :proj4 = "+proj=latlong +ellps=WGS84 +to_meter=1.0000000000" ;
+		string :AREA_OR_POINT = "Area" ;
+		string :COMPRESSION = "LZW" ;
+		string :INTERLEAVE = "BAND" ;
+		string :LAYOUT = "COG" ;
+		string :NoData = "-9999" ;
+}
+
+netCDF tools testing completed
