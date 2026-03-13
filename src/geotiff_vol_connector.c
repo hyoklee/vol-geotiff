@@ -736,20 +736,184 @@ void *geotiff_dataset_open(void *obj, const H5VL_loc_params_t __attribute__((unu
     dset->data = NULL;
     dset->data_size = 0;
     dset->is_image = false;
+    dset->is_latlon = false;
+    dset->is_lat = false;
     dset->space_id = H5I_INVALID_HID;
     dset->type_id = H5I_INVALID_HID;
     dset->gtif = NULL;
     dset->directory_index = -1;
 
-    /* Parse dataset name to extract image index (e.g., "image0", "/image1", etc.) */
+    /* Parse dataset name: "imageN", "latN", or "lonN" */
     int image_index = 0;
     if (sscanf(name, "/image%d", &image_index) == 1 || sscanf(name, "image%d", &image_index) == 1) {
         if (image_index < 0)
             FUNC_GOTO_ERROR(H5E_DATASET, H5E_BADVALUE, NULL,
                             "Invalid image index %d (must be non-negative)", image_index);
+    } else if (sscanf(name, "/lat%d", &image_index) == 1 || sscanf(name, "lat%d", &image_index) == 1) {
+        dset->is_latlon = true;
+        dset->is_lat    = true;
+    } else if (sscanf(name, "/lon%d", &image_index) == 1 || sscanf(name, "lon%d", &image_index) == 1) {
+        dset->is_latlon = true;
+        dset->is_lat    = false;
     } else {
         FUNC_GOTO_ERROR(H5E_DATASET, H5E_BADVALUE, NULL,
-                        "Invalid dataset name '%s', expected 'imageN' format", name);
+                        "Invalid dataset name '%s', expected 'imageN', 'latN', or 'lonN'", name);
+    }
+
+    /* --- lat/lon coordinate dataset path --- */
+    if (dset->is_latlon) {
+        uint16_t pixscale_count = 0, tiepoint_count = 0;
+        double *pixscale = NULL, *tiepoints = NULL;
+        uint32_t img_width = 0, img_height = 0;
+        double ulx, uly, px, py;
+
+        num_dirs = (uint16_t)TIFFNumberOfDirectories(file->tiff);
+        if (image_index < 0 || (unsigned)image_index >= (unsigned)num_dirs)
+            FUNC_GOTO_ERROR(H5E_DATASET, H5E_NOTFOUND, NULL,
+                            "Directory %d not found (file has %d)", image_index, (int)num_dirs);
+
+        if (!TIFFSetDirectory(file->tiff, (uint16_t)image_index))
+            FUNC_GOTO_ERROR(H5E_DATASET, H5E_CANTGET, NULL,
+                            "Failed to set TIFF directory to %d", image_index);
+
+        TIFFGetField(file->tiff, TIFFTAG_IMAGEWIDTH,  &img_width);
+        TIFFGetField(file->tiff, TIFFTAG_IMAGELENGTH, &img_height);
+
+        if (TIFFGetField(file->tiff, TIFFTAG_GEOPIXELSCALE, &pixscale_count, &pixscale) &&
+            pixscale_count >= 2 &&
+            TIFFGetField(file->tiff, TIFFTAG_GEOTIEPOINTS, &tiepoint_count, &tiepoints) &&
+            tiepoint_count >= 6) {
+            /* GeoTIFF tags present in this directory */
+            double scale_x = pixscale[0];
+            double scale_y = pixscale[1];
+            ulx = tiepoints[3] - tiepoints[0] * scale_x;
+            uly = tiepoints[4] + tiepoints[1] * scale_y;
+            px  =  scale_x;
+            py  = -scale_y;
+        } else {
+            /* Overview directory: derive geotransform from main image (directory 0) */
+            uint16_t main_psc = 0, main_tpc = 0;
+            double *main_ps = NULL, *main_tp = NULL;
+            uint32_t main_w = 0, main_h = 0;
+
+            if (!TIFFSetDirectory(file->tiff, 0))
+                FUNC_GOTO_ERROR(H5E_DATASET, H5E_CANTGET, NULL,
+                                "Failed to set TIFF directory to 0 for geotransform");
+            TIFFGetField(file->tiff, TIFFTAG_IMAGEWIDTH,  &main_w);
+            TIFFGetField(file->tiff, TIFFTAG_IMAGELENGTH, &main_h);
+            if (!TIFFGetField(file->tiff, TIFFTAG_GEOPIXELSCALE, &main_psc, &main_ps) ||
+                main_psc < 2 ||
+                !TIFFGetField(file->tiff, TIFFTAG_GEOTIEPOINTS, &main_tpc, &main_tp) ||
+                main_tpc < 6)
+                FUNC_GOTO_ERROR(H5E_DATASET, H5E_CANTGET, NULL,
+                                "No geotransform in main TIFF directory");
+
+            double main_scale_x = main_ps[0];
+            double main_scale_y = main_ps[1];
+            ulx = main_tp[3] - main_tp[0] * main_scale_x;
+            uly = main_tp[4] + main_tp[1] * main_scale_y;
+            /* Scale pixel size proportionally to the overview dimensions */
+            px =  main_scale_x * ((double)main_w / (double)img_width);
+            py = -main_scale_y * ((double)main_h / (double)img_height);
+        }
+
+        dset->directory_index = image_index;
+
+        /* Detect CRS type from directory 0 (has definitive GeoTIFF keys) */
+        bool is_geographic = true;
+        GTIFDefn latlon_defn;
+        memset(&latlon_defn, 0, sizeof(latlon_defn));
+        if (TIFFSetDirectory(file->tiff, 0)) {
+            GTIF *tmp_gtif = GTIFNew(file->tiff);
+            if (tmp_gtif) {
+                if (GTIFGetDefn(tmp_gtif, &latlon_defn) && latlon_defn.DefnSet)
+                    is_geographic = (latlon_defn.Model == ModelTypeGeographic);
+                GTIFFree(tmp_gtif);
+            }
+        }
+
+        if (is_geographic) {
+            /* 1D arrays: lat has length=height, lon has length=width */
+            hsize_t n = dset->is_lat ? (hsize_t)img_height : (hsize_t)img_width;
+            dset->data_size = n * sizeof(double);
+
+            if ((dset->data = malloc(dset->data_size)) == NULL)
+                FUNC_GOTO_ERROR(H5E_RESOURCE, H5E_CANTALLOC, NULL,
+                                "Failed to allocate lat/lon data array");
+
+            double *vals = (double *)dset->data;
+            if (dset->is_lat) {
+                for (hsize_t i = 0; i < n; i++)
+                    vals[i] = uly + (double)i * py;
+            } else {
+                for (hsize_t j = 0; j < n; j++)
+                    vals[j] = ulx + (double)j * px;
+            }
+
+            if ((dset->space_id = H5Screate_simple(1, &n, NULL)) < 0)
+                FUNC_GOTO_ERROR(H5E_DATASPACE, H5E_CANTCREATE, NULL,
+                                "Failed to create 1D lat/lon dataspace");
+        } else {
+            /* 2D arrays [height, width]: projected CRS — convert each pixel to lat/lon */
+            hsize_t h = (hsize_t)img_height;
+            hsize_t w = (hsize_t)img_width;
+            hsize_t total = h * w;
+
+            double *X = (double *)malloc(total * sizeof(double));
+            double *Y = (double *)malloc(total * sizeof(double));
+            if (!X || !Y) {
+                free(X);
+                free(Y);
+                FUNC_GOTO_ERROR(H5E_RESOURCE, H5E_CANTALLOC, NULL,
+                                "Failed to allocate projected coordinate arrays");
+            }
+
+            /* Compute projected (X, Y) for each pixel's top-left corner */
+            for (hsize_t row = 0; row < h; row++) {
+                for (hsize_t col = 0; col < w; col++) {
+                    X[row * w + col] = ulx + (double)col * px;
+                    Y[row * w + col] = uly + (double)row * py;
+                }
+            }
+
+            /* Convert projected coordinates to geographic (lon, lat) in-place */
+            if (!GTIFProj4ToLatLong(&latlon_defn, (int)total, X, Y)) {
+                free(X);
+                free(Y);
+                FUNC_GOTO_ERROR(H5E_DATASET, H5E_CANTGET, NULL,
+                                "GTIFProj4ToLatLong failed for projected CRS");
+            }
+
+            /* X is now longitude, Y is now latitude */
+            dset->data_size = total * sizeof(double);
+            if ((dset->data = malloc(dset->data_size)) == NULL) {
+                free(X);
+                free(Y);
+                FUNC_GOTO_ERROR(H5E_RESOURCE, H5E_CANTALLOC, NULL,
+                                "Failed to allocate 2D lat/lon output array");
+            }
+
+            double *vals = (double *)dset->data;
+            if (dset->is_lat) {
+                memcpy(vals, Y, dset->data_size);
+            } else {
+                memcpy(vals, X, dset->data_size);
+            }
+            free(X);
+            free(Y);
+
+            hsize_t dims[2] = {h, w};
+            if ((dset->space_id = H5Screate_simple(2, dims, NULL)) < 0)
+                FUNC_GOTO_ERROR(H5E_DATASPACE, H5E_CANTCREATE, NULL,
+                                "Failed to create 2D lat/lon dataspace");
+        }
+
+        if ((dset->type_id = H5Tcopy(H5T_NATIVE_DOUBLE)) < 0)
+            FUNC_GOTO_ERROR(H5E_DATATYPE, H5E_CANTCOPY, NULL,
+                            "Failed to copy double type for lat/lon");
+
+        ret_value = dset_obj;
+        goto done;
     }
 
     /* Check if this image directory exists in the TIFF file */
@@ -1319,7 +1483,7 @@ herr_t geotiff_group_get(void *obj, H5VL_group_get_args_t *args,
 
             /* Fill in group info structure */
             ginfo->storage_type = H5G_STORAGE_TYPE_COMPACT;
-            ginfo->nlinks = num_dirs; /* Number of image links (image0, image1, ...) */
+            ginfo->nlinks = (hsize_t)num_dirs * 3; /* imageN, latN, lonN per directory */
             ginfo->max_corder = -1;   /* No creation order tracking */
             ginfo->mounted = false;   /* No files mounted on this group */
 
@@ -1413,40 +1577,8 @@ void *geotiff_attr_open(void *obj, const H5VL_loc_params_t *loc_params, const ch
     attr->parent = obj;
     attr->space_id = H5I_INVALID_HID;
     attr->type_id = H5I_INVALID_HID;
-    attr->is_coordinate_attr = false;
-
-    /* Check if this is the special "coordinates" attribute on a dataset */
-    if (parent_obj->obj_type == H5I_DATASET && strcmp(name, "coordinates") == 0) {
-        geotiff_dataset_t *dset = &parent_obj->u.dataset;
-
-        /* Only provide coordinates for image datasets */
-        if (!dset->is_image)
-            FUNC_GOTO_ERROR(H5E_ATTR, H5E_NOTFOUND, NULL,
-                            "coordinates attribute only available on image datasets");
-
-        attr->is_coordinate_attr = true;
-
-        /* Create 2D dataspace [height, width] for coordinates (one coord per pixel) */
-        hsize_t coord_dims[2];
-        hsize_t dset_dims[3];
-        H5Sget_simple_extent_dims(dset->space_id, dset_dims, NULL);
-
-        /* Coordinates are per-pixel, so always 2D regardless of dataset dimensionality */
-        coord_dims[0] = dset_dims[0]; /* height */
-        coord_dims[1] = dset_dims[1]; /* width */
-
-        if ((attr->space_id = H5Screate_simple(2, coord_dims, NULL)) < 0)
-            FUNC_GOTO_ERROR(H5E_ATTR, H5E_CANTCREATE, NULL,
-                            "Failed to create dataspace for coordinates attribute");
-
-        /* Create the compound type for {lon, lat} */
-        if ((attr->type_id = geotiff_create_coordinate_type()) < 0)
-            FUNC_GOTO_ERROR(H5E_ATTR, H5E_CANTCREATE, NULL,
-                            "Failed to create coordinate compound type");
-    } else if (parent_obj->obj_type == H5I_FILE && strcmp(name, "num_images") == 0) {
+    if (parent_obj->obj_type == H5I_FILE && strcmp(name, "num_images") == 0) {
         /* Special "num_images" attribute on file object */
-        attr->is_coordinate_attr = false; /* This is a different special attribute */
-
         /* Create scalar dataspace for the count */
         if ((attr->space_id = H5Screate(H5S_SCALAR)) < 0)
             FUNC_GOTO_ERROR(H5E_ATTR, H5E_CANTCREATE, NULL,
@@ -1479,7 +1611,6 @@ void *geotiff_attr_open(void *obj, const H5VL_loc_params_t *loc_params, const ch
                                         "Failed to set variable string size");
                     }
                     attr->type_id = str_type;
-                    attr->is_coordinate_attr = false;
                     break;
                 }
             }
@@ -1487,6 +1618,36 @@ void *geotiff_attr_open(void *obj, const H5VL_loc_params_t *loc_params, const ch
         if (!found)
             FUNC_GOTO_ERROR(H5E_ATTR, H5E_NOTFOUND, NULL,
                             "Metadata attribute '%s' not found", name);
+    } else if (parent_obj->obj_type == H5I_DATASET && parent_obj->u.dataset.is_image) {
+        if (strcmp(name, "coordinates") != 0)
+            FUNC_GOTO_ERROR(H5E_ATTR, H5E_NOTFOUND, NULL,
+                            "Unknown attribute '%s' on image dataset", name);
+        if ((attr->space_id = H5Screate(H5S_SCALAR)) < 0)
+            FUNC_GOTO_ERROR(H5E_ATTR, H5E_CANTCREATE, NULL,
+                            "Failed to create scalar dataspace for coordinates attribute");
+        hid_t str_type = H5Tcopy(H5T_C_S1);
+        if (str_type < 0)
+            FUNC_GOTO_ERROR(H5E_ATTR, H5E_CANTCOPY, NULL, "Failed to copy string type");
+        if (H5Tset_size(str_type, H5T_VARIABLE) < 0) {
+            H5Tclose(str_type);
+            FUNC_GOTO_ERROR(H5E_ATTR, H5E_CANTSET, NULL, "Failed to set variable string size");
+        }
+        attr->type_id = str_type;
+    } else if (parent_obj->obj_type == H5I_DATASET && parent_obj->u.dataset.is_latlon) {
+        if (strcmp(name, "units") != 0)
+            FUNC_GOTO_ERROR(H5E_ATTR, H5E_NOTFOUND, NULL,
+                            "Unknown attribute '%s' on lat/lon dataset", name);
+        if ((attr->space_id = H5Screate(H5S_SCALAR)) < 0)
+            FUNC_GOTO_ERROR(H5E_ATTR, H5E_CANTCREATE, NULL,
+                            "Failed to create scalar dataspace for units attribute");
+        hid_t str_type = H5Tcopy(H5T_C_S1);
+        if (str_type < 0)
+            FUNC_GOTO_ERROR(H5E_ATTR, H5E_CANTCOPY, NULL, "Failed to copy string type");
+        if (H5Tset_size(str_type, H5T_VARIABLE) < 0) {
+            H5Tclose(str_type);
+            FUNC_GOTO_ERROR(H5E_ATTR, H5E_CANTSET, NULL, "Failed to set variable string size");
+        }
+        attr->type_id = str_type;
     } else {
         /* Unknown attribute - report error */
         FUNC_GOTO_ERROR(H5E_ATTR, H5E_NOTFOUND, NULL, "Unknown attribute '%s' on object type %d",
@@ -1520,18 +1681,7 @@ herr_t geotiff_attr_read(void *attr, hid_t __attribute__((unused)) mem_type_id, 
     if (!buf)
         FUNC_GOTO_ERROR(H5E_ATTR, H5E_BADVALUE, FAIL, "Invalid attribute or buffer");
 
-    /* Handle the computed coordinates attribute */
-    if (a->is_coordinate_attr) {
-        const geotiff_object_t *parent_obj = (const geotiff_object_t *) a->parent;
-        const geotiff_dataset_t *dset = &parent_obj->u.dataset;
-
-        if (!dset->gtif)
-            FUNC_GOTO_ERROR(H5E_ATTR, H5E_BADVALUE, FAIL, "Invalid parent dataset for coordinates");
-
-        /* Compute coordinates for all pixels - pass H5S_ALL for full selection */
-        if (geotiff_compute_coordinates(dset, buf, H5S_ALL) < 0)
-            FUNC_GOTO_ERROR(H5E_ATTR, H5E_READERROR, FAIL, "Failed to compute coordinates");
-    } else if (strcmp(a->name, "num_images") == 0) {
+    if (strcmp(a->name, "num_images") == 0) {
         /* Handle the num_images attribute on file object */
         const geotiff_object_t *parent_obj = (const geotiff_object_t *) a->parent;
 
@@ -1545,6 +1695,30 @@ herr_t geotiff_attr_read(void *attr, hid_t __attribute__((unused)) mem_type_id, 
         /* Get number of directories and write to buffer */
         uint64_t num_dirs = (uint64_t) TIFFNumberOfDirectories(parent_obj->u.file.tiff);
         *((uint64_t *) buf) = num_dirs;
+    } else if (strcmp(a->name, "coordinates") == 0) {
+        const geotiff_object_t *parent_obj = (const geotiff_object_t *)a->parent;
+        if (parent_obj->obj_type != H5I_DATASET || !parent_obj->u.dataset.is_image)
+            FUNC_GOTO_ERROR(H5E_ATTR, H5E_BADVALUE, FAIL,
+                            "coordinates attribute only valid on image datasets");
+        int idx = parent_obj->u.dataset.directory_index;
+        char coord_val[32];
+        snprintf(coord_val, sizeof(coord_val), "lat%d lon%d", idx, idx);
+        char *str_copy = strdup(coord_val);
+        if (!str_copy)
+            FUNC_GOTO_ERROR(H5E_ATTR, H5E_CANTALLOC, FAIL,
+                            "Failed to duplicate coordinates string");
+        *((char **)buf) = str_copy;
+    } else if (strcmp(a->name, "units") == 0) {
+        const geotiff_object_t *parent_obj = (const geotiff_object_t *)a->parent;
+        if (parent_obj->obj_type != H5I_DATASET || !parent_obj->u.dataset.is_latlon)
+            FUNC_GOTO_ERROR(H5E_ATTR, H5E_BADVALUE, FAIL,
+                            "units attribute only valid on lat/lon datasets");
+        const char *units = parent_obj->u.dataset.is_lat ? "degrees_north" : "degrees_east";
+        char *str_copy = strdup(units);
+        if (!str_copy)
+            FUNC_GOTO_ERROR(H5E_ATTR, H5E_CANTALLOC, FAIL,
+                            "Failed to duplicate units string");
+        *((char **)buf) = str_copy;
     } else {
         /* GDAL metadata string attribute */
         const geotiff_object_t *parent_obj = (const geotiff_object_t *)a->parent;
@@ -1663,6 +1837,54 @@ herr_t geotiff_attr_specific(void *obj, const H5VL_loc_params_t __attribute__((u
             if (!iter)
                 FUNC_GOTO_ERROR(H5E_ATTR, H5E_BADVALUE, FAIL, "Invalid iterator args");
 
+            /* For dataset objects, expose per-dataset attributes */
+            if (o->obj_type == H5I_DATASET) {
+                const char *attr_name = NULL;
+                size_t attr_data_size = 0;
+                char coord_val[32];
+
+                if (o->u.dataset.is_latlon) {
+                    attr_name = "units";
+                    attr_data_size = strlen("degrees_north") + 1;
+                } else if (o->u.dataset.is_image) {
+                    snprintf(coord_val, sizeof(coord_val),
+                             "lat%d lon%d", o->u.dataset.directory_index,
+                             o->u.dataset.directory_index);
+                    attr_name = "coordinates";
+                    attr_data_size = strlen(coord_val) + 1;
+                } else {
+                    break;
+                }
+
+                if (start_idx > 0)
+                    break; /* only one attribute per dataset */
+                o->ref_count++;
+                if ((loc_id = H5VLwrap_register((void *)o, H5I_DATASET)) < 0) {
+                    o->ref_count--;
+                    FUNC_GOTO_ERROR(H5E_ATTR, H5E_CANTREGISTER, FAIL,
+                                    "Failed to wrap dataset for attribute iteration");
+                }
+                if (iter->idx) *iter->idx = 0;
+                if (iter->op) {
+                    H5A_info_t ainfo;
+                    memset(&ainfo, 0, sizeof(H5A_info_t));
+                    ainfo.data_size = attr_data_size;
+                    herr_t cb_ret = iter->op(loc_id, attr_name, &ainfo, iter->op_data);
+                    if (iter->idx) *iter->idx = 1;
+                    H5Idec_ref(loc_id);
+                    if (cb_ret < 0)
+                        FUNC_GOTO_ERROR(H5E_ATTR, H5E_BADITER, FAIL,
+                                        "Attribute iterator callback returned error");
+                    else if (cb_ret > 0) {
+                        ret_value = cb_ret;
+                        goto done;
+                    }
+                } else {
+                    H5Idec_ref(loc_id);
+                }
+                break;
+            }
+
             /* Only iterate file-level metadata on file or group objects */
             if (o->obj_type != H5I_FILE && o->obj_type != H5I_GROUP)
                 break;
@@ -1726,8 +1948,11 @@ herr_t geotiff_attr_specific(void *obj, const H5VL_loc_params_t __attribute__((u
             const char *name = args->args.exists.name;
             bool found = false;
 
-            /* Only check file-level metadata on file or group objects */
-            if ((o->obj_type == H5I_FILE || o->obj_type == H5I_GROUP) && meta) {
+            if (o->obj_type == H5I_DATASET && o->u.dataset.is_latlon) {
+                found = (strcmp(name, "units") == 0);
+            } else if (o->obj_type == H5I_DATASET && o->u.dataset.is_image) {
+                found = (strcmp(name, "coordinates") == 0);
+            } else if ((o->obj_type == H5I_FILE || o->obj_type == H5I_GROUP) && meta) {
                 for (int i = 0; i < meta->count; i++) {
                     if (strcmp(meta->items[i].key, name) == 0) {
                         found = true;
@@ -2172,8 +2397,12 @@ void *geotiff_object_open(void *obj, const H5VL_loc_params_t *loc_params,
                                            H5P_DEFAULT, dxpl_id, req);
             *opened_type = H5I_GROUP;
         } else if (sscanf(name, "image%d", &image_idx) == 1 ||
-                   sscanf(name, "/image%d", &image_idx) == 1) {
-            /* Dataset */
+                   sscanf(name, "/image%d", &image_idx) == 1 ||
+                   sscanf(name, "lat%d", &image_idx) == 1 ||
+                   sscanf(name, "/lat%d", &image_idx) == 1 ||
+                   sscanf(name, "lon%d", &image_idx) == 1 ||
+                   sscanf(name, "/lon%d", &image_idx) == 1) {
+            /* Dataset (image, lat, or lon) */
             ret_value = geotiff_dataset_open(obj, loc_params, name,
                                              H5P_DEFAULT, dxpl_id, req);
             *opened_type = H5I_DATASET;
@@ -2321,7 +2550,11 @@ herr_t geotiff_link_specific(void *obj, const H5VL_loc_params_t *loc_params,
                 bool exists = false;
 
                 if ((sscanf(link_name, "image%d", &image_index) == 1 ||
-                     sscanf(link_name, "/image%d", &image_index) == 1) &&
+                     sscanf(link_name, "/image%d", &image_index) == 1 ||
+                     sscanf(link_name, "lat%d", &image_index) == 1 ||
+                     sscanf(link_name, "/lat%d", &image_index) == 1 ||
+                     sscanf(link_name, "lon%d", &image_index) == 1 ||
+                     sscanf(link_name, "/lon%d", &image_index) == 1) &&
                     image_index >= 0) {
                     uint16_t num_dirs = (uint16_t)TIFFNumberOfDirectories(file->tiff);
                     exists = ((unsigned)image_index < (unsigned)num_dirs);
@@ -2360,12 +2593,19 @@ herr_t geotiff_link_specific(void *obj, const H5VL_loc_params_t *loc_params,
 
             start_idx = iter_args->idx_p ? *iter_args->idx_p : 0;
 
-            for (hsize_t i = start_idx; i < (hsize_t)num_dirs; i++) {
+            for (hsize_t i = start_idx; i < (hsize_t)num_dirs * 3; i++) {
                 char dset_name[32];
                 H5L_info2_t linfo;
                 herr_t cb_ret;
+                unsigned dir  = (unsigned)(i / 3);
+                unsigned kind = (unsigned)(i % 3); /* 0=image, 1=lat, 2=lon */
 
-                snprintf(dset_name, sizeof(dset_name), "image%u", (unsigned)i);
+                if (kind == 0)
+                    snprintf(dset_name, sizeof(dset_name), "image%u", dir);
+                else if (kind == 1)
+                    snprintf(dset_name, sizeof(dset_name), "lat%u", dir);
+                else
+                    snprintf(dset_name, sizeof(dset_name), "lon%u", dir);
 
                 memset(&linfo, 0, sizeof(H5L_info2_t));
                 linfo.type         = H5L_TYPE_HARD;
@@ -2409,106 +2649,6 @@ done:
     return ret_value;
 }
 
-/* Helper function to create the coordinate compound type {lon, lat} */
-hid_t geotiff_create_coordinate_type(void)
-{
-    hid_t coord_type = H5I_INVALID_HID;
-    hid_t ret_value = H5I_INVALID_HID;
-
-    /* Create compound type */
-    if ((coord_type = H5Tcreate(H5T_COMPOUND, sizeof(coord_t))) < 0)
-        FUNC_GOTO_ERROR(H5E_DATATYPE, H5E_CANTCREATE, H5I_INVALID_HID,
-                        "Failed to create compound type for coordinates");
-
-    /* Insert longitude field */
-    if (H5Tinsert(coord_type, "lon", HOFFSET(coord_t, lon), H5T_NATIVE_DOUBLE) < 0)
-        FUNC_GOTO_ERROR(H5E_DATATYPE, H5E_CANTINSERT, H5I_INVALID_HID,
-                        "Failed to insert lon field in coordinate type");
-
-    /* Insert latitude field */
-    if (H5Tinsert(coord_type, "lat", HOFFSET(coord_t, lat), H5T_NATIVE_DOUBLE) < 0)
-        FUNC_GOTO_ERROR(H5E_DATATYPE, H5E_CANTINSERT, H5I_INVALID_HID,
-                        "Failed to insert lat field in coordinate type");
-
-    ret_value = coord_type;
-
-done:
-    if (ret_value < 0 && coord_type >= 0)
-        H5Tclose(coord_type);
-
-    return ret_value;
-}
-
-/* Helper function to compute coordinates for all pixels in the dataset */
-herr_t geotiff_compute_coordinates(const geotiff_dataset_t *dset, void *buf,
-                                   hid_t __attribute__((unused)) mem_space_id)
-{
-    herr_t ret_value = SUCCEED;
-    GTIFDefn defn;
-    hsize_t dims[3];
-    int ndims;
-    uint32_t width, height;
-
-    coord_t *coords = (coord_t *) buf;
-
-    if (!dset || !dset->gtif || !buf)
-        FUNC_GOTO_ERROR(H5E_ARGS, H5E_BADVALUE, FAIL, "Invalid dataset or buffer");
-
-    /* Get dataset dimensions */
-    if ((ndims = H5Sget_simple_extent_ndims(dset->space_id)) < 0)
-        FUNC_GOTO_ERROR(H5E_DATASPACE, H5E_CANTGET, FAIL, "Failed to get dataspace rank");
-
-    if (H5Sget_simple_extent_dims(dset->space_id, dims, NULL) < 0)
-        FUNC_GOTO_ERROR(H5E_DATASPACE, H5E_CANTGET, FAIL, "Failed to get dataspace dimensions");
-
-    /* Extract height and width from dimensions */
-    if (ndims != 2 && ndims != 3)
-        FUNC_GOTO_ERROR(H5E_DATASPACE, H5E_BADVALUE, FAIL, "Unsupported number of dimensions");
-
-    height = (uint32_t) dims[0];
-    width = (uint32_t) dims[1];
-
-    /* Get the GeoTIFF definition (projection parameters) */
-    if (!GTIFGetDefn(dset->gtif, &defn))
-        FUNC_GOTO_ERROR(H5E_DATASET, H5E_CANTGET, FAIL, "Failed to get GeoTIFF definition");
-
-    /* Compute coordinates for each pixel */
-    for (uint32_t row = 0; row < height; row++) {
-        for (uint32_t col = 0; col < width; col++) {
-            double x = (double) col;
-            double y = (double) row;
-            size_t idx = row * width + col;
-
-            /* Step 1: Convert pixel coordinates to projected coordinates */
-            if (!GTIFImageToPCS(dset->gtif, &x, &y)) {
-                /* If transformation fails, set to NaN */
-                coords[idx].lon = NAN;
-                coords[idx].lat = NAN;
-                continue;
-            }
-
-            /* Step 2: If projected coordinate system, convert to lat/long */
-            if (defn.Model == ModelTypeGeographic) {
-                /* Already in geographic coordinates (lat/lon) */
-                coords[idx].lon = x; /* longitude */
-                coords[idx].lat = y; /* latitude */
-            } else {
-                /* Projected coordinates - convert to lat/long */
-                if (GTIFProj4ToLatLong(&defn, 1, &x, &y)) {
-                    coords[idx].lon = x; /* longitude */
-                    coords[idx].lat = y; /* latitude */
-                } else {
-                    /* Conversion failed */
-                    coords[idx].lon = NAN;
-                    coords[idx].lat = NAN;
-                }
-            }
-        }
-    }
-
-done:
-    return ret_value;
-}
 
 herr_t geotiff_introspect_get_cap_flags(const void GEOTIFF_UNUSED_PARAM *info, uint64_t *cap_flags)
 {

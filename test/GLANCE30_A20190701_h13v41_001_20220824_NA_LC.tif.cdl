@@ -1,0 +1,32 @@
+Testing netCDF tools with GeoTIFF VOL connector
+Testing ncdump with GeoTIFF file: GLANCE30_A20190701_h13v41_001_20220824_NA_LC.tif
+netcdf GLANCE30_A20190701_h13v41_001_20220824_NA_LC {
+dimensions:
+	phony_dim_0 = 5000 ;
+	phony_dim_1 = 5000 ;
+variables:
+	ubyte image0(phony_dim_0, phony_dim_1) ;
+		string image0:coordinates = "lat0 lon0" ;
+	double lat0(phony_dim_0, phony_dim_1) ;
+		string lat0:units = "degrees_north" ;
+	double lon0(phony_dim_0, phony_dim_1) ;
+		string lon0:units = "degrees_east" ;
+
+// global attributes:
+		string :GeoTransform = "-5683670 30 0 -1073535 0 -30" ;
+		string :origin = "(-5683670, -1073535)" ;
+		string :pixel_size = "(30, -30)" ;
+		string :CornerCoordinates_UpperLeft = "(-5683670.0000000, -1073535.0000000)" ;
+		string :CornerCoordinates_LowerLeft = "(-5683670.0000000, -1223535.0000000)" ;
+		string :CornerCoordinates_UpperRight = "(-5533670.0000000, -1073535.0000000)" ;
+		string :CornerCoordinates_LowerRight = "(-5533670.0000000, -1223535.0000000)" ;
+		string :CornerCoordinates_Center = "(-5608670.0000000, -1148535.0000000)" ;
+		string :coordinate_system = "EPSG:32767" ;
+		string :proj4 = "+proj=laea +lat_0=50.000000000 +lon_0=-100.000000000 +x_0=0.000 +y_0=0.000 +ellps=WGS84 +units=m " ;
+		string :AREA_OR_POINT = "Area" ;
+		string :COMPRESSION = "LZW" ;
+		string :INTERLEAVE = "BAND" ;
+		string :NoData = "255" ;
+}
+
+netCDF tools testing completed

@@ -64,6 +64,8 @@ typedef struct geotiff_dataset_t {
     void *data;          /* Cached data */
     size_t data_size;    /* Data size in bytes */
     bool is_image;       /* Is this an image dataset */
+    bool is_latlon;      /* Is this a latN or lonN coordinate dataset */
+    bool is_lat;         /* True for latN, false for lonN (only valid if is_latlon) */
 } geotiff_dataset_t;
 
 /* GeoTIFF VOL group object structure */
@@ -77,7 +79,6 @@ typedef struct geotiff_attr_t {
     char *name;              /* Attribute name */
     hid_t type_id;           /* HDF5 datatype */
     hid_t space_id;          /* HDF5 dataspace */
-    bool is_coordinate_attr; /* True if this is the computed 'coordinates' attribute */
 } geotiff_attr_t;
 
 /* Unified GeoTIFF VOL object structure */
@@ -93,10 +94,6 @@ struct geotiff_object_t {
     } u;
 };
 
-typedef struct {
-    double lon;
-    double lat;
-} coord_t;
 
 /* Function prototypes (HDF5 develop expects hid_t vipl_id) */
 herr_t geotiff_init_connector(hid_t vipl_id);
@@ -146,8 +143,6 @@ herr_t geotiff_object_get(void *obj, const H5VL_loc_params_t *loc_params,
 herr_t geotiff_read_hyperslab(const geotiff_object_t *dset_obj, const hsize_t *start,
                               const hsize_t *stride, const hsize_t *count, const hsize_t *block,
                               int ndims, hid_t mem_type_id, void *buf);
-hid_t geotiff_create_coordinate_type(void);
-herr_t geotiff_compute_coordinates(const geotiff_dataset_t *dset, void *buf, hid_t mem_space_id);
 
 herr_t geotiff_introspect_opt_query(void *obj, H5VL_subclass_t subcls, int opt_type,
                                     uint64_t *flags);
