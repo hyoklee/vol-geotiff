@@ -27,4 +27,12 @@ echo "Testing ncdump with GeoTIFF file: $GEOTIFF_FILE"
 "${NCDUMP}" -h "$GEOTIFF_FILE" || echo "ncdump header failed"
 
 echo ""
+echo "Dumping lat0 values:"
+"${NCDUMP}" -v lat0 "$GEOTIFF_FILE" || echo "ncdump lat0 failed"
+
+echo ""
+echo "Dumping lon0 values:"
+"${NCDUMP}" -v lon0 "$GEOTIFF_FILE" || echo "ncdump lon0 failed"
+
+echo ""
 echo "netCDF tools testing completed"
