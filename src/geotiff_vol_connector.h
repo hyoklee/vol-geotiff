@@ -66,6 +66,7 @@ typedef struct geotiff_dataset_t {
     bool is_image;       /* Is this an image dataset */
     bool is_latlon;      /* Is this a latN or lonN coordinate dataset */
     bool is_lat;         /* True for latN, false for lonN (only valid if is_latlon) */
+    bool is_1d;          /* True when lat/lon is 1D (geographic/EPSG:4326 CRS) */
 } geotiff_dataset_t;
 
 /* GeoTIFF VOL group object structure */

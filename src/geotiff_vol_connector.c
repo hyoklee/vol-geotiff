@@ -777,6 +777,7 @@ void *geotiff_dataset_open(void *obj, const H5VL_loc_params_t __attribute__((unu
     dset->is_image = false;
     dset->is_latlon = false;
     dset->is_lat = false;
+    dset->is_1d = false;
     dset->space_id = H5I_INVALID_HID;
     dset->type_id = H5I_INVALID_HID;
     dset->gtif = NULL;
@@ -873,8 +874,32 @@ void *geotiff_dataset_open(void *obj, const H5VL_loc_params_t __attribute__((unu
             }
         }
 
-        /* Always generate 2D lat/lon arrays [height, width] */
-        {
+        if (is_geographic) {
+            /* EPSG:4326 (geographic CRS): generate 1D coordinate arrays.
+             * lat[row] = uly + row * py  (size = height)
+             * lon[col] = ulx + col * px  (size = width) */
+            hsize_t n = dset->is_lat ? (hsize_t) img_height : (hsize_t) img_width;
+            dset->data_size = n * sizeof(double);
+            if ((dset->data = malloc(dset->data_size)) == NULL)
+                FUNC_GOTO_ERROR(H5E_RESOURCE, H5E_CANTALLOC, NULL,
+                                "Failed to allocate 1D lat/lon array");
+
+            double *vals = (double *) dset->data;
+            if (dset->is_lat) {
+                for (hsize_t row = 0; row < n; row++)
+                    vals[row] = uly + (double) row * py;
+            } else {
+                for (hsize_t col = 0; col < n; col++)
+                    vals[col] = ulx + (double) col * px;
+            }
+
+            if ((dset->space_id = H5Screate_simple(1, &n, NULL)) < 0)
+                FUNC_GOTO_ERROR(H5E_DATASPACE, H5E_CANTCREATE, NULL,
+                                "Failed to create 1D lat/lon dataspace");
+
+            dset->is_1d = true;
+        } else {
+            /* Projected CRS: generate 2D lat/lon arrays [height, width] */
             hsize_t h = (hsize_t) img_height;
             hsize_t w = (hsize_t) img_width;
             hsize_t total = h * w;
@@ -888,7 +913,6 @@ void *geotiff_dataset_open(void *obj, const H5VL_loc_params_t __attribute__((unu
                                 "Failed to allocate coordinate arrays");
             }
 
-            /* Compute coordinates for each pixel using affine transform */
             for (hsize_t row = 0; row < h; row++) {
                 for (hsize_t col = 0; col < w; col++) {
                     X[row * w + col] = ulx + (double) col * px;
@@ -896,14 +920,11 @@ void *geotiff_dataset_open(void *obj, const H5VL_loc_params_t __attribute__((unu
                 }
             }
 
-            /* For projected CRS, convert to geographic (lon, lat) in-place */
-            if (!is_geographic) {
-                if (!GTIFProj4ToLatLong(&latlon_defn, (int) total, X, Y)) {
-                    free(X);
-                    free(Y);
-                    FUNC_GOTO_ERROR(H5E_DATASET, H5E_CANTGET, NULL,
-                                    "GTIFProj4ToLatLong failed for projected CRS");
-                }
+            if (!GTIFProj4ToLatLong(&latlon_defn, (int) total, X, Y)) {
+                free(X);
+                free(Y);
+                FUNC_GOTO_ERROR(H5E_DATASET, H5E_CANTGET, NULL,
+                                "GTIFProj4ToLatLong failed for projected CRS");
             }
 
             /* X is longitude, Y is latitude */

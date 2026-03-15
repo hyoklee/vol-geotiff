@@ -1,4 +1,6 @@
-/* check_latlon.c — verify lat/lon values against gdalinfo expected values */
+/* check_latlon.c — verify lat/lon values against gdalinfo expected values.
+ * Handles both 1D (geographic/EPSG:4326) and 2D (projected CRS) lat/lon arrays.
+ */
 #include <stdio.h>
 #include <math.h>
 #include <hdf5.h>
@@ -26,21 +28,44 @@ static const struct { int w, h; } dims[4] = {
 
 static int nerrors = 0;
 
-/* Read a single double from dataset at [row][col] */
-static double read_val(hid_t file, const char *dset_name, hsize_t row, hsize_t col)
+/*
+ * Read a single double from a dataset.
+ * - For 1D datasets: lat uses `row` as index, lon uses `col` as index.
+ * - For 2D datasets: uses [row, col].
+ * is_lat: true for lat datasets, false for lon datasets.
+ */
+static double read_latlon(hid_t file, const char *dset_name, int is_lat,
+                          hsize_t row, hsize_t col)
 {
     hid_t dset = H5Dopen2(file, dset_name, H5P_DEFAULT);
-    if (dset < 0) { fprintf(stderr, "Cannot open %s\n", dset_name); return 0.0/0.0; }
+    if (dset < 0) {
+        fprintf(stderr, "Cannot open %s\n", dset_name);
+        return 0.0 / 0.0;
+    }
 
     hid_t fspace = H5Dget_space(dset);
-    hsize_t start[2] = {row, col};
-    hsize_t count[2] = {1, 1};
-    H5Sselect_hyperslab(fspace, H5S_SELECT_SET, start, NULL, count, NULL);
+    int ndims = H5Sget_simple_extent_ndims(fspace);
+    double val = 0.0;
 
-    hid_t mspace = H5Screate_simple(2, count, NULL);
-    double val;
-    H5Dread(dset, H5T_NATIVE_DOUBLE, mspace, fspace, H5P_DEFAULT, &val);
-    H5Sclose(mspace);
+    if (ndims == 1) {
+        /* 1D: lat indexed by row, lon indexed by col */
+        hsize_t idx = is_lat ? row : col;
+        hsize_t start[1] = {idx};
+        hsize_t count[1] = {1};
+        H5Sselect_hyperslab(fspace, H5S_SELECT_SET, start, NULL, count, NULL);
+        hid_t mspace = H5Screate_simple(1, count, NULL);
+        H5Dread(dset, H5T_NATIVE_DOUBLE, mspace, fspace, H5P_DEFAULT, &val);
+        H5Sclose(mspace);
+    } else {
+        /* 2D: [row, col] */
+        hsize_t start[2] = {row, col};
+        hsize_t count[2] = {1, 1};
+        H5Sselect_hyperslab(fspace, H5S_SELECT_SET, start, NULL, count, NULL);
+        hid_t mspace = H5Screate_simple(2, count, NULL);
+        H5Dread(dset, H5T_NATIVE_DOUBLE, mspace, fspace, H5P_DEFAULT, &val);
+        H5Sclose(mspace);
+    }
+
     H5Sclose(fspace);
     H5Dclose(dset);
     return val;
@@ -77,61 +102,80 @@ int main(int argc, char *argv[])
         double px_i = PX * ((double) dims[0].w / W);
         double py_i = PY * ((double) dims[0].h / H);
 
-        printf("\n=== %s / %s  (%d x %d)  px=%.12f  py=%.12f ===\n",
-               latname, lonname, W, H, px_i, py_i);
+        /* Detect 1D vs 2D by checking dataset rank */
+        hid_t dset = H5Dopen2(file, latname, H5P_DEFAULT);
+        int ndims = 0;
+        if (dset >= 0) {
+            hid_t sp = H5Dget_space(dset);
+            ndims = H5Sget_simple_extent_ndims(sp);
+            H5Sclose(sp);
+            H5Dclose(dset);
+        }
+        const char *layout = (ndims == 1) ? "1D" : "2D";
+
+        printf("\n=== %s / %s  (%d x %d)  px=%.12f  py=%.12f  [%s] ===\n",
+               latname, lonname, W, H, px_i, py_i, layout);
 
         /* corner (0,0) */
         double exp_lat_00 = ULY;
         double exp_lon_00 = ULX;
-        snprintf(label, sizeof(label), "%s[0][0]", latname);
-        check(label, read_val(file, latname, 0, 0), exp_lat_00, tol);
-        snprintf(label, sizeof(label), "%s[0][0]", lonname);
-        check(label, read_val(file, lonname, 0, 0), exp_lon_00, tol);
+        snprintf(label, sizeof(label), "%s[0]", latname);
+        check(label, read_latlon(file, latname, 1, 0, 0), exp_lat_00, tol);
+        snprintf(label, sizeof(label), "%s[0]", lonname);
+        check(label, read_latlon(file, lonname, 0, 0, 0), exp_lon_00, tol);
 
-        /* corner (0, W-1) — upper-right */
-        double exp_lat_0W = ULY;                        /* lat doesn't vary with col */
+        /* corner (0, W-1) — upper-right: lat unchanged (row=0), lon at col W-1 */
+        double exp_lat_0W = ULY;
         double exp_lon_0W = ULX + (W - 1) * px_i;
-        snprintf(label, sizeof(label), "%s[0][%d]", latname, W-1);
-        check(label, read_val(file, latname, 0, W-1), exp_lat_0W, tol);
-        snprintf(label, sizeof(label), "%s[0][%d]", lonname, W-1);
-        check(label, read_val(file, lonname, 0, W-1), exp_lon_0W, tol);
+        snprintf(label, sizeof(label), "%s[0] (upper-right)", latname);
+        check(label, read_latlon(file, latname, 1, 0, W-1), exp_lat_0W, tol);
+        snprintf(label, sizeof(label), "%s[%d]", lonname, W-1);
+        check(label, read_latlon(file, lonname, 0, 0, W-1), exp_lon_0W, tol);
 
-        /* corner (H-1, 0) — lower-left */
+        /* corner (H-1, 0) — lower-left: lat at row H-1, lon unchanged (col=0) */
         double exp_lat_H0 = ULY + (H - 1) * py_i;
-        double exp_lon_H0 = ULX;                        /* lon doesn't vary with row */
-        snprintf(label, sizeof(label), "%s[%d][0]", latname, H-1);
-        check(label, read_val(file, latname, H-1, 0), exp_lat_H0, tol);
-        snprintf(label, sizeof(label), "%s[%d][0]", lonname, H-1);
-        check(label, read_val(file, lonname, H-1, 0), exp_lon_H0, tol);
+        double exp_lon_H0 = ULX;
+        snprintf(label, sizeof(label), "%s[%d]", latname, H-1);
+        check(label, read_latlon(file, latname, 1, H-1, 0), exp_lat_H0, tol);
+        snprintf(label, sizeof(label), "%s[0] (lower-left)", lonname);
+        check(label, read_latlon(file, lonname, 0, H-1, 0), exp_lon_H0, tol);
 
         /* corner (H-1, W-1) — lower-right */
         double exp_lat_HW = ULY + (H - 1) * py_i;
         double exp_lon_HW = ULX + (W - 1) * px_i;
-        snprintf(label, sizeof(label), "%s[%d][%d]", latname, H-1, W-1);
-        check(label, read_val(file, latname, H-1, W-1), exp_lat_HW, tol);
-        snprintf(label, sizeof(label), "%s[%d][%d]", lonname, H-1, W-1);
-        check(label, read_val(file, lonname, H-1, W-1), exp_lon_HW, tol);
+        snprintf(label, sizeof(label), "%s[%d] (lower-right)", latname, H-1);
+        check(label, read_latlon(file, latname, 1, H-1, W-1), exp_lat_HW, tol);
+        snprintf(label, sizeof(label), "%s[%d] (lower-right)", lonname, W-1);
+        check(label, read_latlon(file, lonname, 0, H-1, W-1), exp_lon_HW, tol);
 
         /* center */
         int cr = H / 2, cc = W / 2;
         double exp_lat_c = ULY + cr * py_i;
         double exp_lon_c = ULX + cc * px_i;
-        snprintf(label, sizeof(label), "%s[%d][%d] (center)", latname, cr, cc);
-        check(label, read_val(file, latname, cr, cc), exp_lat_c, tol);
-        snprintf(label, sizeof(label), "%s[%d][%d] (center)", lonname, cr, cc);
-        check(label, read_val(file, lonname, cr, cc), exp_lon_c, tol);
+        snprintf(label, sizeof(label), "%s[%d] (center)", latname, cr);
+        check(label, read_latlon(file, latname, 1, cr, cc), exp_lat_c, tol);
+        snprintf(label, sizeof(label), "%s[%d] (center)", lonname, cc);
+        check(label, read_latlon(file, lonname, 0, cr, cc), exp_lon_c, tol);
 
-        /* verify lat is constant across a row (row 0, compare col 0 vs col W/2) */
-        double lat_r0_c0   = read_val(file, latname, 0, 0);
-        double lat_r0_cMid = read_val(file, latname, 0, W/2);
-        snprintf(label, sizeof(label), "%s row-constant check", latname);
-        check(label, lat_r0_cMid, lat_r0_c0, tol);
+        /* For 1D: verify lat array size == H, lon array size == W */
+        if (ndims == 1) {
+            hid_t ld = H5Dopen2(file, latname, H5P_DEFAULT);
+            hid_t sp = H5Dget_space(ld);
+            hsize_t lat_n = 0;
+            H5Sget_simple_extent_dims(sp, &lat_n, NULL);
+            H5Sclose(sp); H5Dclose(ld);
 
-        /* verify lon is constant down a column (col 0, compare row 0 vs row H/2) */
-        double lon_c0_r0   = read_val(file, lonname, 0, 0);
-        double lon_c0_rMid = read_val(file, lonname, H/2, 0);
-        snprintf(label, sizeof(label), "%s col-constant check", lonname);
-        check(label, lon_c0_rMid, lon_c0_r0, tol);
+            hid_t lond = H5Dopen2(file, lonname, H5P_DEFAULT);
+            sp = H5Dget_space(lond);
+            hsize_t lon_n = 0;
+            H5Sget_simple_extent_dims(sp, &lon_n, NULL);
+            H5Sclose(sp); H5Dclose(lond);
+
+            snprintf(label, sizeof(label), "%s size == %d (height)", latname, H);
+            check(label, (double) lat_n, (double) H, 0.5);
+            snprintf(label, sizeof(label), "%s size == %d (width)", lonname, W);
+            check(label, (double) lon_n, (double) W, 0.5);
+        }
     }
 
     H5Fclose(file);

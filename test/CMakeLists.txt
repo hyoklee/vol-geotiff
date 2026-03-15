@@ -2,6 +2,40 @@
 add_executable (test_runner test_runner.c plugin_tests.c geotiff_tests.c)
 target_include_directories (test_runner PRIVATE "${PROJECT_SOURCE_DIR}/src" ${HDF5_INCLUDE_DIRS} ${GEOTIFF_INCLUDE_DIRS})
 
+# check_latlon: verify 1D lat/lon coordinate values for EPSG:4326 files
+if(EXISTS "${PROJECT_SOURCE_DIR}/test/EMIT_L2B_FRCOVPV_001_20260311T195709_2607013_014.tif")
+    add_executable(check_latlon check_latlon.c)
+    target_include_directories(check_latlon PRIVATE ${HDF5_INCLUDE_DIRS})
+    target_link_libraries(check_latlon PRIVATE HDF5::HDF5 m)
+
+    add_test(NAME check_latlon
+             COMMAND ${CMAKE_COMMAND} -E env
+                     "HDF5_PLUGIN_PATH=${PROJECT_BINARY_DIR}/src"
+                     "HDF5_VOL_CONNECTOR=geotiff_vol_connector"
+                     $<TARGET_FILE:check_latlon>
+                     "${PROJECT_SOURCE_DIR}/test/EMIT_L2B_FRCOVPV_001_20260311T195709_2607013_014.tif")
+    set_tests_properties(check_latlon PROPERTIES
+        WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}/test")
+endif()
+
+# check_image_data: verify imageN pixel values via netCDF API match libtiff directly
+find_package(NetCDF QUIET)
+if(EXISTS "${PROJECT_SOURCE_DIR}/test/EMIT_L2B_FRCOVPV_001_20260311T195709_2607013_014.tif"
+   AND TARGET NetCDF::NetCDF)
+    add_executable(check_image_data check_image_data.c)
+    target_include_directories(check_image_data PRIVATE ${HDF5_INCLUDE_DIRS})
+    target_link_libraries(check_image_data PRIVATE NetCDF::NetCDF Tiff::Tiff m)
+
+    add_test(NAME check_image_data
+             COMMAND ${CMAKE_COMMAND} -E env
+                     "HDF5_PLUGIN_PATH=${PROJECT_BINARY_DIR}/src"
+                     "HDF5_VOL_CONNECTOR=geotiff_vol_connector"
+                     $<TARGET_FILE:check_image_data>
+                     "${PROJECT_SOURCE_DIR}/test/EMIT_L2B_FRCOVPV_001_20260311T195709_2607013_014.tif")
+    set_tests_properties(check_image_data PROPERTIES
+        WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}/test")
+endif()
+
 # Define the plugin path for the tests to use
 target_compile_definitions(test_runner PRIVATE
     GEOTIFF_VOL_PLUGIN_PATH="${PROJECT_BINARY_DIR}/src")
