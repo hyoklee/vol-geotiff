@@ -13,7 +13,7 @@ jobs:
 
     - name: Create Release
       id: create_release
-      uses: softprops/action-gh-release@v2
+      uses: softprops/action-gh-release@v3
       env:
         GITHUB_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
       with:
@@ -114,7 +114,7 @@ jobs:
         tar -czf geotiff-vol-connector-linux-${{ matrix.arch }}.tar.gz geotiff-vol-connector-linux-${{ matrix.arch }}
 
     - name: Upload Release Asset
-      uses: softprops/action-gh-release@v2
+      uses: softprops/action-gh-release@v3
       env:
         GITHUB_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
       with:
@@ -182,7 +182,7 @@ jobs:
         tar -czf geotiff-vol-connector-macos.tar.gz geotiff-vol-connector-macos
 
     - name: Upload Release Asset
-      uses: softprops/action-gh-release@v2
+      uses: softprops/action-gh-release@v3
       env:
         GITHUB_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
       with:
@@ -210,7 +210,7 @@ jobs:
         tar -czf geotiff-vol-connector-source.tar.gz geotiff-vol-connector-source
 
     - name: Upload Source Asset
-      uses: softprops/action-gh-release@v2
+      uses: softprops/action-gh-release@v3
       env:
         GITHUB_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
       with:
